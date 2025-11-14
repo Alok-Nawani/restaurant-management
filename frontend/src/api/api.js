@@ -27,11 +27,13 @@ export async function fetchJSON(path, opts = {}) {
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({ message: 'Network error' }));
       
-      // Handle token expiration
-      if (res.status === 401 && errorData.message?.includes('token')) {
+      // Handle token expiration or invalid token (401 or 400 with "Invalid token")
+      if (res.status === 401 || (res.status === 400 && errorData.message?.includes('Invalid token'))) {
+        console.warn('Token invalid or expired. Clearing localStorage and redirecting to login...');
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        window.location.href = '/login';
+        window.location.href = '/login?session=expired';
+        throw new Error('Session expired. Please login again.');
       }
       
       throw new Error(errorData.message || `HTTP ${res.status}`);
