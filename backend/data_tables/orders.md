@@ -1,12 +1,12 @@
 # Orders
 
-**Last Updated:** 11/15/2025, 7:06:03 PM
+**Last Updated:** 11/15/2025, 7:07:10 PM
 
 **Total Records:** 67
 
 | id | tableNumber | status | total | customer | items | createdAt | updatedAt |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | 5 | PENDING | 0 | Aman (null) | Poori x2, Dhokla x1 | 2025-11-15T04:30:00.000Z | 2025-11-15T13:36:03.598Z |
+| 1 | 5 | PENDING | 0 | Aman (null) | Poori x2, Dhokla x1 | 2025-11-15T04:30:00.000Z | 2025-11-15T13:37:10.820Z |
 | 2 | T-02 | CONFIRMED | 780 | Riya (null) | Mutton Biryani x3, Rajma x2, Masoor Dal x1 | 2025-11-14T05:31:00.000Z | 2025-11-15T11:31:44.619Z |
 | 3 | T-03 | PREPARING | 725 | Amit Patel (amit.patel2@email.com) | Seekh Kebab x2, Navratan Korma x1, Tinda Sabzi x1, Soup x3 | 2025-11-13T06:32:00.000Z | 2025-11-15T11:31:44.625Z |
 | 4 | T-04 | READY | 1035 | Sunita Reddy (sunita.reddy3@email.com) | Thalassery Biryani x1, Mix Vegetable Curry x3, Chana Pulao x2, Fresh Juice x2, Tarka Dal x1 | 2025-11-12T07:33:00.000Z | 2025-11-15T11:31:44.630Z |
@@ -70,6 +70,6 @@
 | 62 | T-08 | COMPLETED | 1035 | Walk-in |  | 2025-10-29T16:17:00.000Z | 2025-11-15T11:31:44.975Z |
 | 63 | T-09 | CANCELLED | 475 | Walk-in |  | 2025-10-28T05:18:00.000Z | 2025-11-15T11:31:44.982Z |
 | 64 | T-10 | PENDING | 1030 | Walk-in |  | 2025-10-27T06:19:00.000Z | 2025-11-15T11:31:44.989Z |
-| 65 | 5 | PENDING | 0 | Riya (null) |  | 2025-11-15T11:33:05.000Z | 2025-11-15T13:36:03.618Z |
-| 1030 | 5 | PENDING | 0 | Riya (null) |  | 2025-11-15T11:35:16.000Z | 2025-11-15T13:36:03.624Z |
-| 1031 | 5 | PENDING | 0 | Riya (null) |  | 2025-11-15T11:49:16.000Z | 2025-11-15T13:36:03.630Z |
+| 65 | 5 | PENDING | 0 | Riya (null) |  | 2025-11-15T11:33:05.000Z | 2025-11-15T13:37:10.834Z |
+| 1030 | 5 | PENDING | 0 | Riya (null) |  | 2025-11-15T11:35:16.000Z | 2025-11-15T13:37:10.840Z |
+| 1031 | 5 | PENDING | 0 | Riya (null) |  | 2025-11-15T11:49:16.000Z | 2025-11-15T13:37:10.846Z |
