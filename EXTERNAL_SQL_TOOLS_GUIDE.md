@@ -55,13 +55,21 @@ backend/database.sqlite
 
 ### DBeaver
 
+**⚠️ IMPORTANT: Use the FULL absolute path, not a relative path!**
+
 1. **Open DBeaver**
 2. **Click "New Database Connection"** (plug icon)
 3. **Select "SQLite"**
 4. **Click "Next"**
-5. **In "Path" field, browse to:** `backend/database.sqlite`
-6. **Click "Test Connection"**
+5. **In "Path" field, enter the FULL absolute path:**
+   ```
+   /Users/alok/Documents/hotel management/backend/database.sqlite
+   ```
+   **OR** click the folder icon (Browse) and navigate to the file
+6. **Click "Test Connection"** - should show "Connected"
 7. **Click "Finish"**
+
+**📖 For detailed step-by-step instructions, see:** `DBeaver_CONNECTION_GUIDE.md`
 
 ### TablePlus
 
@@ -269,18 +277,41 @@ backend/database.sqlite
 You can also use SQLite from the terminal:
 
 ```bash
-# Connect to database
-cd backend
+# Navigate to backend directory
+cd "/Users/alok/Documents/hotel management/backend"
+
+# Connect to database (interactive mode)
 sqlite3 database.sqlite
 
-# Run queries
+# Run a single query
+sqlite3 database.sqlite "UPDATE Orders SET status = 'CONFIRMED' WHERE id = 1034;"
+
+# View data
 sqlite3 database.sqlite "SELECT * FROM Orders LIMIT 5;"
-
-# Interactive mode
-sqlite3 database.sqlite
 ```
 
-All changes made via command line will also be automatically synced!
+### Important: Always Update `updatedAt`
+
+When running UPDATE queries from terminal, **always include `updatedAt`**:
+
+```sql
+UPDATE Orders 
+SET status = 'CONFIRMED', 
+    updatedAt = CURRENT_TIMESTAMP 
+WHERE id = 1034;
+```
+
+### Manual Sync After Terminal Queries
+
+After running queries from terminal, you can manually trigger a sync:
+
+```bash
+cd "/Users/alok/Documents/hotel management/backend"
+node sync-db.js          # Sync all tables
+node sync-db.js Orders   # Sync specific table
+```
+
+**Note:** Changes are automatically detected every 3 seconds, but manual sync is instant!
 
 ---
 
@@ -293,4 +324,5 @@ If you encounter issues:
 4. Try manual sync via "Refresh Tables" button
 
 Happy querying! 🚀
+
 

@@ -6,6 +6,8 @@ const { setExportingFromSQL } = require('./markdownSync');
 
 // Track last known modification times
 let lastModTimes = {};
+// Track table checksums for better change detection
+let lastChecksums = {};
 let isMonitoring = false;
 let monitoringInterval = null;
 
@@ -25,17 +27,21 @@ const tableMapping = {
 // Get table modification time from SQLite
 async function getTableModTime(tableName) {
   try {
-    // Query SQLite's internal tables to get modification info
-    const [results] = await sequelize.query(
-      `SELECT MAX(updatedAt) as lastMod FROM ${tableName}`,
-      { type: sequelize.QueryTypes.SELECT }
-    );
-    
-    if (results && results.lastMod) {
-      return new Date(results.lastMod).getTime();
+    // First, try to get MAX(updatedAt) if the table has that column
+    try {
+      const [results] = await sequelize.query(
+        `SELECT MAX(updatedAt) as lastMod FROM ${tableName}`,
+        { type: sequelize.QueryTypes.SELECT }
+      );
+      
+      if (results && results.lastMod) {
+        return new Date(results.lastMod).getTime();
+      }
+    } catch (e) {
+      // Table might not have updatedAt column, continue to other methods
     }
     
-    // Fallback: check file modification time
+    // Fallback: check file modification time (more reliable for external changes)
     const dbPath = path.join(__dirname, '..', 'database.sqlite');
     if (fs.existsSync(dbPath)) {
       return fs.statSync(dbPath).mtime.getTime();
@@ -52,17 +58,54 @@ async function getTableModTime(tableName) {
   }
 }
 
+// Get table row count and checksum for change detection
+async function getTableChecksum(tableName) {
+  try {
+    // Get row count
+    const [countResult] = await sequelize.query(
+      `SELECT COUNT(*) as count FROM ${tableName}`,
+      { type: sequelize.QueryTypes.SELECT }
+    );
+    const rowCount = countResult?.count || 0;
+    
+    // Get a simple checksum of recent rows (last 10 rows' IDs)
+    try {
+      const [checksumResult] = await sequelize.query(
+        `SELECT GROUP_CONCAT(id) as ids FROM (SELECT id FROM ${tableName} ORDER BY id DESC LIMIT 10)`,
+        { type: sequelize.QueryTypes.SELECT }
+      );
+      const checksum = `${rowCount}-${checksumResult?.ids || ''}`;
+      return checksum;
+    } catch (e) {
+      // If no id column, just use row count
+      return `${rowCount}`;
+    }
+  } catch (error) {
+    return '0';
+  }
+}
+
 // Check for changes in a specific table
 async function checkTableChanges(tableName) {
   const mapping = tableMapping[tableName];
   if (!mapping) return false;
   
+  // Method 1: Check modification time
   const currentModTime = await getTableModTime(tableName);
   const lastModTime = lastModTimes[tableName] || 0;
   
-  if (currentModTime > lastModTime) {
-    console.log(`[DB Monitor] 🔄 Detected changes in ${tableName}`);
+  // Method 2: Check checksum (catches changes even without updatedAt)
+  const currentChecksum = await getTableChecksum(tableName);
+  const lastChecksum = lastChecksums[tableName] || '';
+  
+  // If either method detects a change, export
+  const timeChanged = currentModTime > lastModTime;
+  const checksumChanged = currentChecksum !== lastChecksum;
+  
+  if (timeChanged || checksumChanged) {
+    console.log(`[DB Monitor] 🔄 Detected changes in ${tableName} (time: ${timeChanged}, checksum: ${checksumChanged})`);
     lastModTimes[tableName] = currentModTime;
+    lastChecksums[tableName] = currentChecksum;
     
     // Export the table to markdown
     try {
@@ -71,6 +114,9 @@ async function checkTableChanges(tableName) {
       if (model) {
         await exportModelToMarkdown(model, mapping.filename);
         console.log(`[DB Monitor] ✅ Exported ${mapping.filename}.md`);
+        
+        // Dispatch event for frontend refresh (if possible)
+        // The frontend will pick this up via its auto-refresh mechanism
         
         // Reset flag after a delay
         setTimeout(() => {
@@ -97,10 +143,11 @@ async function startMonitoring(intervalMs = 3000) {
   
   console.log('[DB Monitor] 🔍 Starting database change monitoring...');
   
-  // Initialize last modification times
+  // Initialize last modification times and checksums
   for (const tableName of Object.keys(tableMapping)) {
     try {
       lastModTimes[tableName] = await getTableModTime(tableName);
+      lastChecksums[tableName] = await getTableChecksum(tableName);
     } catch (error) {
       console.warn(`[DB Monitor] Could not get mod time for ${tableName}:`, error.message);
     }
@@ -120,22 +167,22 @@ async function startMonitoring(intervalMs = 3000) {
       if (fs.existsSync(dbPath)) {
         const currentFileModTime = fs.statSync(dbPath).mtime.getTime();
         
-        if (currentFileModTime > lastFileModTime) {
-          console.log('[DB Monitor] 📝 Database file modified externally, checking all tables...');
+        // Always check all tables (not just when file mtime changes)
+        // This ensures we catch changes even if mtime doesn't update immediately
+        let hasChanges = false;
+        for (const tableName of Object.keys(tableMapping)) {
+          const changed = await checkTableChanges(tableName);
+          if (changed) hasChanges = true;
+        }
+        
+        if (hasChanges) {
           lastFileModTime = currentFileModTime;
-          
-          // Check all tables for changes
-          let hasChanges = false;
-          for (const tableName of Object.keys(tableMapping)) {
-            const changed = await checkTableChanges(tableName);
-            if (changed) hasChanges = true;
-          }
-          
-          if (hasChanges) {
-            // Notify frontend (via a file or event that frontend can poll)
-            // For now, we'll rely on the frontend's auto-refresh mechanism
-            console.log('[DB Monitor] ✅ Changes detected and exported');
-          }
+          console.log('[DB Monitor] ✅ Changes detected and exported');
+        } else if (currentFileModTime > lastFileModTime) {
+          // File was modified but no table changes detected yet
+          // This might be a write in progress, so update the timestamp
+          lastFileModTime = currentFileModTime;
+          console.log('[DB Monitor] 📝 Database file modified, monitoring for changes...');
         }
       }
     } catch (error) {
@@ -165,9 +212,10 @@ async function forceSyncAll() {
     await exportAllTables(models);
     console.log('[DB Monitor] ✅ All tables synced');
     
-    // Update last mod times
+    // Update last mod times and checksums
     for (const tableName of Object.keys(tableMapping)) {
       lastModTimes[tableName] = await getTableModTime(tableName);
+      lastChecksums[tableName] = await getTableChecksum(tableName);
     }
   } catch (error) {
     console.error('[DB Monitor] ❌ Error during force sync:', error.message);
@@ -193,6 +241,7 @@ async function syncTable(tableName) {
     if (model) {
       await exportModelToMarkdown(model, mapping.filename);
       lastModTimes[tableName] = await getTableModTime(tableName);
+      lastChecksums[tableName] = await getTableChecksum(tableName);
       console.log(`[DB Monitor] ✅ Synced ${tableName} -> ${mapping.filename}.md`);
     }
   } catch (error) {
@@ -212,4 +261,5 @@ module.exports = {
   syncTable,
   isMonitoring: () => isMonitoring
 };
+
 
