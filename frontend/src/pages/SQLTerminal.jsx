@@ -421,12 +421,12 @@ ORDER BY totalSpent DESC;`
                 onClick={refreshTables}
                 disabled={loading}
                 className="px-4 py-2 bg-indigo-700 hover:bg-indigo-800 text-white rounded-lg transition-colors disabled:bg-indigo-400 disabled:cursor-not-allowed flex items-center gap-2"
-                title="Export all tables to markdown"
+                title="Sync database changes to markdown files (useful after using external SQL tools)"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
-                Refresh Tables
+                Sync Now
               </button>
             </div>
           </div>
@@ -434,6 +434,23 @@ ORDER BY totalSpent DESC;`
       </div>
 
       <div className="max-w-7xl mx-auto p-6">
+        {/* Info Banner */}
+        <div className="mb-4 bg-blue-50 border-l-4 border-blue-400 p-4 rounded-lg">
+          <div className="flex items-start">
+            <svg className="w-5 h-5 text-blue-600 mt-0.5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div className="flex-1">
+              <h4 className="font-semibold text-blue-800 mb-1">💡 External SQL Tools Supported!</h4>
+              <p className="text-sm text-blue-700">
+                You can use <strong>DB Browser for SQLite</strong>, <strong>DBeaver</strong>, <strong>TablePlus</strong>, or any SQL tool to connect to <code className="bg-blue-100 px-1 rounded">backend/database.sqlite</code>. 
+                Changes are automatically synced to markdown files and frontend every 3 seconds. 
+                Use the <strong>"Sync Now"</strong> button for immediate sync.
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Tabs */}
         <div className="mb-6 bg-white rounded-xl shadow-lg border border-indigo-200">
           <div className="flex border-b border-gray-200">

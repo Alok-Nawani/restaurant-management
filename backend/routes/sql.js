@@ -4,6 +4,7 @@ const { sequelize, ...models } = require('../models');
 const { auth } = require('../middleware/auth');
 const { exportAllTables, exportModelToMarkdown } = require('../utils/tableExporter');
 const { setExportingFromSQL } = require('../utils/markdownSync');
+const { forceSyncAll, syncTable } = require('../utils/databaseChangeMonitor');
 
 // Execute SQL query
 router.post('/execute', auth, async (req, res) => {
@@ -369,7 +370,7 @@ router.get('/schema/:tableName', auth, async (req, res) => {
 // Refresh/export all tables to markdown
 router.post('/refresh-tables', auth, async (req, res) => {
   try {
-    await exportAllTables(models);
+    await forceSyncAll();
     res.json({
       success: true,
       message: 'All tables exported to markdown files successfully'
@@ -379,6 +380,24 @@ router.post('/refresh-tables', auth, async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to refresh tables'
+    });
+  }
+});
+
+// Sync a specific table
+router.post('/sync-table/:tableName', auth, async (req, res) => {
+  try {
+    const { tableName } = req.params;
+    await syncTable(tableName);
+    res.json({
+      success: true,
+      message: `Table ${tableName} synced successfully`
+    });
+  } catch (error) {
+    console.error('Error syncing table:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to sync table'
     });
   }
 });

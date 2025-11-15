@@ -61,6 +61,12 @@ async function start(){
     console.log('✅ Markdown file watcher enabled (edit data_tables/*.md to update database)');
   }
   
+  // Start database change monitoring for external SQL tools
+  if (process.env.ENABLE_DB_MONITOR !== 'false') {
+    startMonitoring(3000); // Check every 3 seconds
+    console.log('✅ Database change monitor enabled (external SQL tools will auto-sync)');
+  }
+  
   app.listen(PORT, () => console.log(`Server started on ${PORT}`));
 }
 start();
