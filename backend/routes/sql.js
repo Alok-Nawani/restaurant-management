@@ -3,6 +3,7 @@ const router = express.Router();
 const { sequelize, ...models } = require('../models');
 const { auth } = require('../middleware/auth');
 const { exportAllTables, exportModelToMarkdown } = require('../utils/tableExporter');
+const { setExportingFromSQL } = require('../utils/markdownSync');
 
 // Execute SQL query
 router.post('/execute', auth, async (req, res) => {
@@ -211,13 +212,15 @@ router.post('/execute', auth, async (req, res) => {
         }
       }
       
-      res.json(responseData);
-      
       // After INSERT/UPDATE/DELETE, trigger markdown export for affected tables
       // This ensures markdown files are updated when using raw SQL
+      // Do this BEFORE sending response to ensure it completes
       try {
         const trimmedQuery = query.trim().toUpperCase();
         if (trimmedQuery.startsWith('INSERT INTO') || trimmedQuery.startsWith('UPDATE') || trimmedQuery.startsWith('DELETE FROM')) {
+          // Set flag to prevent markdown sync watcher from overwriting our changes
+          setExportingFromSQL(true);
+          
           // Determine which table was affected
           let tableName = null;
           if (trimmedQuery.startsWith('INSERT INTO')) {
@@ -273,16 +276,27 @@ router.post('/execute', auth, async (req, res) => {
               };
               const filename = filenameMap[modelName] || modelName.toLowerCase();
               await exportModelToMarkdown(model, filename);
-              console.log(`[SQL] Exported ${filename}.md after SQL ${trimmedQuery.split(' ')[0]} on ${tableName}`);
+              console.log(`[SQL] ✅ Exported ${filename}.md after SQL ${trimmedQuery.split(' ')[0]} on ${tableName}`);
+              
+              // Wait a bit to ensure file write completes
+              await new Promise(resolve => setTimeout(resolve, 100));
             } else {
               console.warn(`[SQL] Model not found for table: ${tableName} (tried: ${modelName})`);
             }
           }
+          
+          // Reset flag after export
+          setTimeout(() => {
+            setExportingFromSQL(false);
+          }, 2000); // Keep flag for 2 seconds to prevent sync loop
         }
       } catch (exportError) {
         // Don't fail the query if export fails
-        console.warn('[SQL] Failed to export after SQL query:', exportError.message);
+        console.error('[SQL] ❌ Failed to export after SQL query:', exportError.message);
+        setExportingFromSQL(false);
       }
+      
+      res.json(responseData);
     }
 
   } catch (error) {

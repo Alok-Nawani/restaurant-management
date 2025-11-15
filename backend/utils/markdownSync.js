@@ -112,6 +112,9 @@ async function syncMarkdownToDatabase(filename) {
   }
 }
 
+// Flag to prevent sync loop when exporting from SQL
+let isExportingFromSQL = false;
+
 // Watch markdown files for changes
 function watchMarkdownFiles() {
   const dataTablesDir = path.join(__dirname, '..', 'data_tables');
@@ -127,6 +130,12 @@ function watchMarkdownFiles() {
   fs.watch(dataTablesDir, { recursive: false }, (eventType, filename) => {
     if (!filename || !filename.endsWith('.md')) return;
     
+    // Skip sync if we're exporting from SQL (to prevent loop)
+    if (isExportingFromSQL) {
+      console.log(`[markdownSync] Skipping sync for ${filename} (exporting from SQL)`);
+      return;
+    }
+    
     const baseName = path.basename(filename, '.md');
     
     // Debounce: wait 1 second after last change
@@ -138,6 +147,11 @@ function watchMarkdownFiles() {
       syncMarkdownToDatabase(baseName);
     }, 1000);
   });
+}
+
+// Function to set export flag
+function setExportingFromSQL(flag) {
+  isExportingFromSQL = flag;
 }
 
 // Sync all markdown files to database
@@ -164,6 +178,7 @@ async function syncAllMarkdownFiles() {
 module.exports = {
   syncMarkdownToDatabase,
   syncAllMarkdownFiles,
-  watchMarkdownFiles
+  watchMarkdownFiles,
+  setExportingFromSQL
 };
 
