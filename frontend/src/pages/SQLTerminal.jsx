@@ -172,19 +172,43 @@ VALUES ('New Dish', 150, 'Curry', 'Delicious curry dish', 1, 1, CURRENT_TIMESTAM
 VALUES ('T-10', 'PENDING', 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`
       },
       {
-        name: 'Add Items to Order',
-        query: `-- First, get the order ID from last_insert_rowid() or SELECT
--- Then add items:
+        name: 'Find Menu Item IDs (Roti, Paneer, Naan)',
+        query: `-- Find Roti, Paneer, and Naan IDs
+SELECT id, name, price FROM MenuItems 
+WHERE name LIKE '%Roti%' OR name LIKE '%Paneer%' OR name LIKE '%Naan%'
+ORDER BY name;`
+      },
+      {
+        name: 'Add Items to Order (Roti + Paneer)',
+        query: `-- Replace 100 with your order ID, and menu item IDs with actual IDs
 INSERT INTO OrderItems (orderId, menuItemId, quantity, price)
 VALUES 
-  (1, 1, 2, 120),  -- 2x Item ID 1
-  (1, 2, 1, 220);  -- 1x Item ID 2
+  (100, 15, 2, 20),   -- 2x Roti (replace 15 with actual Roti ID)
+  (100, 25, 1, 130);  -- 1x Paneer (replace 25 with actual Paneer ID)
 
 -- Update order total:
 UPDATE Orders 
-SET total = (SELECT SUM(quantity * price) FROM OrderItems WHERE orderId = 1),
+SET total = (SELECT SUM(quantity * price) FROM OrderItems WHERE orderId = 100),
     updatedAt = CURRENT_TIMESTAMP
-WHERE id = 1;`
+WHERE id = 100;`
+      },
+      {
+        name: 'Change Roti to Naan in Order',
+        query: `-- Step 1: Find order item ID for Roti
+SELECT oi.id, m.name FROM OrderItems oi
+JOIN MenuItems m ON oi.menuItemId = m.id
+WHERE oi.orderId = 100 AND m.name LIKE '%Roti%';
+
+-- Step 2: Update to Naan (replace IDs with actual values)
+UPDATE OrderItems 
+SET menuItemId = 16, price = 30, updatedAt = CURRENT_TIMESTAMP
+WHERE id = 5 AND orderId = 100;
+
+-- Step 3: Update order total
+UPDATE Orders 
+SET total = (SELECT SUM(quantity * price) FROM OrderItems WHERE orderId = 100),
+    updatedAt = CURRENT_TIMESTAMP
+WHERE id = 100;`
       },
       {
         name: 'Update Order Status to CONFIRMED',
