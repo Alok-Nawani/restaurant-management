@@ -1,12 +1,12 @@
 # Orders
 
-**Last Updated:** 11/15/2025, 11:40:20 PM
+**Last Updated:** 11/15/2025, 11:52:08 PM
 
 **Total Records:** 70
 
 | id | tableNumber | status | total | customer | items | createdAt | updatedAt |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | 5 | PENDING | 0 | Aman (null) | Poori x2, Dhokla x1 | 2025-11-15T04:30:00.000Z | 2025-11-15T18:10:17.947Z |
+| 1 | 5 | PENDING | 0 | Aman (null) | Poori x2, Dhokla x1 | 2025-11-15T04:30:00.000Z | 2025-11-15T18:21:54.262Z |
 | 2 | T-02 | CONFIRMED | 780 | Riya (null) | Mutton Biryani x3, Rajma x2, Masoor Dal x1 | 2025-11-14T05:31:00.000Z | 2025-11-15T11:31:44.619Z |
 | 3 | T-03 | PREPARING | 725 | Amit Patel (amit.patel2@email.com) | Seekh Kebab x2, Navratan Korma x1, Tinda Sabzi x1, Soup x3 | 2025-11-13T06:32:00.000Z | 2025-11-15T11:31:44.625Z |
 | 4 | T-04 | READY | 1035 | Sunita Reddy (sunita.reddy3@email.com) | Thalassery Biryani x1, Mix Vegetable Curry x3, Chana Pulao x2, Fresh Juice x2, Tarka Dal x1 | 2025-11-12T07:33:00.000Z | 2025-11-15T11:31:44.630Z |
@@ -70,9 +70,9 @@
 | 62 | T-08 | COMPLETED | 1035 | Walk-in |  | 2025-10-29T16:17:00.000Z | 2025-11-15T11:31:44.975Z |
 | 63 | T-09 | CANCELLED | 475 | Walk-in |  | 2025-10-28T05:18:00.000Z | 2025-11-15T11:31:44.982Z |
 | 64 | T-10 | PENDING | 1030 | Walk-in |  | 2025-10-27T06:19:00.000Z | 2025-11-15T11:31:44.989Z |
-| 65 | 5 | PENDING | 0 | Riya (null) |  | 2025-11-15T11:33:05.000Z | 2025-11-15T18:10:17.962Z |
-| 1030 | 5 | PENDING | 0 | Riya (null) |  | 2025-11-15T11:35:16.000Z | 2025-11-15T18:10:17.968Z |
-| 1031 | 5 | PENDING | 0 | Riya (null) |  | 2025-11-15T11:49:16.000Z | 2025-11-15T18:10:17.973Z |
-| 1032 | 10 | READY | 290 | Walk-in | Cheese Burst Pizza x1 | 2025-11-15T13:39:11.403Z | 2025-11-15T18:10:17.979Z |
-| 1033 | T-10 | PENDING | 0 | Aman (null) |  | 2025-11-15T13:40:39.000Z | 2025-11-15T13:40:39.000Z |
-| 1034 | 12 | READY | 390 | Walk-in | BBQ Chicken Pizza x1, Badam Milk x1 | 2025-11-15T13:52:38.064Z | 2025-11-15T18:10:17.985Z |
+| 65 | 5 | PENDING | 0 | Riya (null) |  | 2025-11-15T11:33:05.000Z | 2025-11-15T18:21:54.277Z |
+| 1030 | 5 | PENDING | 0 | Riya (null) |  | 2025-11-15T11:35:16.000Z | 2025-11-15T18:21:54.284Z |
+| 1031 | 5 | PENDING | 0 | Riya (null) |  | 2025-11-15T11:49:16.000Z | 2025-11-15T18:21:54.290Z |
+| 1032 | 10 | READY | 290 | Walk-in | Cheese Burst Pizza x1 | 2025-11-15T13:39:11.403Z | 2025-11-15T18:21:54.297Z |
+| 1033 | T-10 | PREPARING | 0 | Aman (null) |  | 2025-11-15T13:40:39.000Z | 2025-11-15T18:22:06.000Z |
+| 1034 | 12 | CONFIRMED | 390 | Walk-in | BBQ Chicken Pizza x1, Badam Milk x1 | 2025-11-15T13:52:38.064Z | 2025-11-15T18:21:54.000Z |

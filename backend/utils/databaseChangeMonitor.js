@@ -68,16 +68,34 @@ async function getTableChecksum(tableName) {
     );
     const rowCount = countResult?.count || 0;
     
-    // Get a simple checksum of recent rows (last 10 rows' IDs)
+    // Get a comprehensive checksum that includes actual data values
+    // This catches changes even if updatedAt doesn't change
     try {
+      // For Orders table, include status in checksum
+      if (tableName === 'Orders') {
+        const [statusChecksum] = await sequelize.query(
+          `SELECT GROUP_CONCAT(id || ':' || status || ':' || COALESCE(updatedAt, '')) as data 
+           FROM (SELECT id, status, updatedAt FROM ${tableName} ORDER BY id DESC LIMIT 50)`,
+          { type: sequelize.QueryTypes.SELECT }
+        );
+        return `${rowCount}-${statusChecksum?.data || ''}`;
+      }
+      
+      // For other tables, use ID and updatedAt
       const [checksumResult] = await sequelize.query(
-        `SELECT GROUP_CONCAT(id) as ids FROM (SELECT id FROM ${tableName} ORDER BY id DESC LIMIT 10)`,
+        `SELECT GROUP_CONCAT(id || ':' || COALESCE(updatedAt, '')) as data 
+         FROM (SELECT id, updatedAt FROM ${tableName} ORDER BY id DESC LIMIT 50)`,
         { type: sequelize.QueryTypes.SELECT }
       );
-      const checksum = `${rowCount}-${checksumResult?.ids || ''}`;
+      const checksum = `${rowCount}-${checksumResult?.data || ''}`;
       return checksum;
     } catch (e) {
-      // If no id column, just use row count
+      // If query fails, use row count and file mtime as fallback
+      const dbPath = path.join(__dirname, '..', 'database.sqlite');
+      if (fs.existsSync(dbPath)) {
+        const mtime = fs.statSync(dbPath).mtime.getTime();
+        return `${rowCount}-${mtime}`;
+      }
       return `${rowCount}`;
     }
   } catch (error) {
@@ -166,27 +184,32 @@ async function startMonitoring(intervalMs = 3000) {
       // Check if database file was modified
       if (fs.existsSync(dbPath)) {
         const currentFileModTime = fs.statSync(dbPath).mtime.getTime();
+        const fileWasModified = currentFileModTime > lastFileModTime;
         
         // Always check all tables (not just when file mtime changes)
         // This ensures we catch changes even if mtime doesn't update immediately
         let hasChanges = false;
         for (const tableName of Object.keys(tableMapping)) {
           const changed = await checkTableChanges(tableName);
-          if (changed) hasChanges = true;
+          if (changed) {
+            hasChanges = true;
+            console.log(`[DB Monitor] 📊 ${tableName} changed - exporting...`);
+          }
         }
         
         if (hasChanges) {
           lastFileModTime = currentFileModTime;
           console.log('[DB Monitor] ✅ Changes detected and exported');
-        } else if (currentFileModTime > lastFileModTime) {
+        } else if (fileWasModified) {
           // File was modified but no table changes detected yet
           // This might be a write in progress, so update the timestamp
           lastFileModTime = currentFileModTime;
-          console.log('[DB Monitor] 📝 Database file modified, monitoring for changes...');
+          console.log('[DB Monitor] 📝 Database file modified, will check again...');
         }
       }
     } catch (error) {
       console.error('[DB Monitor] Error during monitoring:', error.message);
+      console.error('[DB Monitor] Stack:', error.stack);
     }
   }, intervalMs);
   
