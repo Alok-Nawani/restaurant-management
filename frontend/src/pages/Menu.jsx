@@ -140,6 +140,22 @@ export default function Menu() {
   useEffect(() => {
     loadMenu();
     loadCustomers();
+    
+    // Listen for database updates from SQL Terminal
+    const handleDatabaseUpdate = () => {
+      loadMenu();
+    };
+    window.addEventListener('databaseUpdated', handleDatabaseUpdate);
+    
+    // Refresh menu every 30 seconds to catch SQL inserts
+    const interval = setInterval(() => {
+      loadMenu();
+    }, 30000);
+    
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('databaseUpdated', handleDatabaseUpdate);
+    };
   }, []);
 
   // Get unique categories
@@ -265,6 +281,16 @@ export default function Menu() {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-semibold">Menu</h2>
         <div className="flex gap-3">
+          <button
+            onClick={loadMenu}
+            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+            title="Refresh menu items"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Refresh
+          </button>
           <button
             onClick={() => setShowCart(true)}
             className="relative bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"

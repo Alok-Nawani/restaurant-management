@@ -67,6 +67,16 @@ export default function Orders() {
     } else {
       setLoading(false);
     }
+    
+    // Listen for database updates from SQL Terminal
+    const handleDatabaseUpdate = () => {
+      loadOrders();
+    };
+    window.addEventListener('databaseUpdated', handleDatabaseUpdate);
+    
+    return () => {
+      window.removeEventListener('databaseUpdated', handleDatabaseUpdate);
+    };
   }, [statusFilter, user]);
 
   const handleStatusUpdate = async (orderId, newStatus) => {

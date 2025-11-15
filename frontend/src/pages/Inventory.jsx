@@ -105,6 +105,16 @@ export default function Inventory() {
     } else {
       setLoading(false);
     }
+    
+    // Listen for database updates from SQL Terminal
+    const handleDatabaseUpdate = () => {
+      loadInventory();
+    };
+    window.addEventListener('databaseUpdated', handleDatabaseUpdate);
+    
+    return () => {
+      window.removeEventListener('databaseUpdated', handleDatabaseUpdate);
+    };
   }, [user]);
 
   const getCategoryColor = (category) => {

@@ -84,6 +84,16 @@ export default function Customers() {
     } else {
       setLoading(false);
     }
+    
+    // Listen for database updates from SQL Terminal
+    const handleDatabaseUpdate = () => {
+      loadCustomers();
+    };
+    window.addEventListener('databaseUpdated', handleDatabaseUpdate);
+    
+    return () => {
+      window.removeEventListener('databaseUpdated', handleDatabaseUpdate);
+    };
   }, [user]);
 
   const onSubmit = async (data) => {

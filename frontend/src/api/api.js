@@ -231,5 +231,10 @@ export const api = {
   
   getTables: () => fetchJSON('/sql/tables'),
   
-  getTableSchema: (tableName) => fetchJSON(`/sql/schema/${tableName}`)
+  getTableSchema: (tableName) => fetchJSON(`/sql/schema/${tableName}`),
+  
+  refreshTables: () =>
+    fetchJSON('/sql/refresh-tables', {
+      method: 'POST'
+    })
 };

@@ -95,6 +95,16 @@ export default function Staff() {
     } else {
       setLoading(false);
     }
+    
+    // Listen for database updates from SQL Terminal
+    const handleDatabaseUpdate = () => {
+      loadStaff();
+    };
+    window.addEventListener('databaseUpdated', handleDatabaseUpdate);
+    
+    return () => {
+      window.removeEventListener('databaseUpdated', handleDatabaseUpdate);
+    };
   }, [user]);
 
   const getPositionColor = (role) => {

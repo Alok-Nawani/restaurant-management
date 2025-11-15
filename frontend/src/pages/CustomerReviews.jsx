@@ -21,6 +21,17 @@ export default function CustomerReviews() {
   useEffect(() => {
     loadReviews();
     loadStats();
+    
+    // Listen for database updates from SQL Terminal
+    const handleDatabaseUpdate = () => {
+      loadReviews();
+      loadStats();
+    };
+    window.addEventListener('databaseUpdated', handleDatabaseUpdate);
+    
+    return () => {
+      window.removeEventListener('databaseUpdated', handleDatabaseUpdate);
+    };
   }, [filters]);
 
   const loadReviews = async () => {

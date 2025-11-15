@@ -163,6 +163,6 @@ function attachExportHooks(modelsRegistry) {
   }
 }
 
-module.exports = { exportAllTables, attachExportHooks };
+module.exports = { exportAllTables, attachExportHooks, exportModelToMarkdown };
 
 

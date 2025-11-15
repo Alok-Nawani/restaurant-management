@@ -28,6 +28,10 @@ start_backend() {
         echo "⚠️  Please update the .env file with your configuration before running again."
         exit 1
     fi
+
+    # Read backend port from .env (default 4000)
+    BACKEND_PORT=$(grep -E '^PORT=' .env | head -n1 | cut -d'=' -f2)
+    if [ -z "$BACKEND_PORT" ]; then BACKEND_PORT=4000; fi
     
     # Install dependencies if node_modules doesn't exist
     if [ ! -d "node_modules" ]; then
@@ -40,7 +44,7 @@ start_backend() {
     npm run seed
     
     # Start backend server
-    echo "🔧 Starting backend server on port 4000..."
+    echo "🔧 Starting backend server on port $BACKEND_PORT..."
     npm run dev &
     BACKEND_PID=$!
     echo "Backend PID: $BACKEND_PID"
@@ -64,7 +68,7 @@ start_frontend() {
     fi
     
     # Start frontend server
-    echo "🎨 Starting frontend server on port 3000..."
+    echo "🎨 Starting frontend server on port 5137..."
     npm run dev &
     FRONTEND_PID=$!
     echo "Frontend PID: $FRONTEND_PID"
@@ -91,8 +95,8 @@ sleep 3
 start_frontend
 
 echo "✅ Hotel Management System is running!"
-echo "🌐 Frontend: http://localhost:3000"
-echo "🔧 Backend API: http://localhost:4000"
+echo "🌐 Frontend: http://localhost:5137"
+echo "🔧 Backend API: http://localhost:${BACKEND_PORT:-4000}"
 echo "📊 Default login: admin / admin123"
 echo ""
 echo "Press Ctrl+C to stop all servers"

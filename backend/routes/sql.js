@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { sequelize } = require('../models');
+const { sequelize, ...models } = require('../models');
 const { auth } = require('../middleware/auth');
+const { exportAllTables, exportModelToMarkdown } = require('../utils/tableExporter');
 
 // Execute SQL query
 router.post('/execute', auth, async (req, res) => {
@@ -72,17 +73,50 @@ router.post('/execute', auth, async (req, res) => {
       });
     } else {
       // For INSERT, UPDATE, DELETE, etc.
+      // Execute the query - Sequelize handles SQLite queries
       const queryResult = await sequelize.query(query);
-      // SQLite returns [result, metadata] format
+      
+      // Sequelize returns [results, metadata] for SQLite
+      // For INSERT/UPDATE/DELETE, results is usually empty array
+      let metadata = null;
+      
       if (Array.isArray(queryResult) && queryResult.length === 2) {
-        const metadata = queryResult[1];
-        // Try to get affected rows from metadata
-        if (metadata && typeof metadata === 'object') {
-          affectedRows = metadata.changes || metadata.affectedRows || 0;
-        }
-        results = queryResult[0];
+        metadata = queryResult[1];
+      }
+      
+      // Try to extract affected rows from metadata
+      if (metadata && typeof metadata === 'object') {
+        affectedRows = metadata.changes !== undefined ? metadata.changes : 1;
       } else {
-        results = queryResult;
+        affectedRows = 1; // Default to 1 if we can't determine
+      }
+      
+      // For INSERT queries, try to get the last inserted row ID
+      if (trimmedQuery.startsWith('INSERT')) {
+        try {
+          const lastIdResult = await sequelize.query(
+            'SELECT last_insert_rowid() as lastInsertRowid',
+            { type: sequelize.QueryTypes.SELECT }
+          );
+          
+          if (lastIdResult && lastIdResult.length > 0) {
+            const row = lastIdResult[0];
+            const lastId = row.lastInsertRowid || row.lastinsertrowid || null;
+            results = {
+              lastInsertRowid: lastId,
+              changes: affectedRows
+            };
+          } else {
+            results = { changes: affectedRows };
+          }
+        } catch (lastIdError) {
+          // If getting last ID fails, just return changes
+          console.warn('Failed to get last_insert_rowid:', lastIdError.message);
+          results = { changes: affectedRows };
+        }
+      } else {
+        // For UPDATE/DELETE, just return changes
+        results = { changes: affectedRows };
       }
     }
 
@@ -156,22 +190,111 @@ router.post('/execute', auth, async (req, res) => {
         message: `Query executed successfully. ${formattedResults.length} row(s) returned.`
       });
     } else {
-      res.json({
+      // For INSERT/UPDATE/DELETE queries
+      const responseData = {
         success: true,
         data: [],
         rowCount: 0,
         columns: [],
         affectedRows: affectedRows,
         message: `Query executed successfully. ${affectedRows} row(s) affected.`
-      });
+      };
+      
+      // If results contain lastInsertRowid (from INSERT), include it
+      if (results && typeof results === 'object' && !Array.isArray(results)) {
+        if (results.lastInsertRowid !== undefined) {
+          responseData.lastInsertRowid = results.lastInsertRowid;
+          responseData.message = `Query executed successfully. ${affectedRows} row(s) affected. Last inserted ID: ${results.lastInsertRowid}`;
+        }
+        if (results.changes !== undefined) {
+          responseData.affectedRows = results.changes;
+        }
+      }
+      
+      res.json(responseData);
+      
+      // After INSERT/UPDATE/DELETE, trigger markdown export for affected tables
+      // This ensures markdown files are updated when using raw SQL
+      try {
+        const trimmedQuery = query.trim().toUpperCase();
+        if (trimmedQuery.startsWith('INSERT INTO') || trimmedQuery.startsWith('UPDATE') || trimmedQuery.startsWith('DELETE FROM')) {
+          // Determine which table was affected
+          let tableName = null;
+          if (trimmedQuery.startsWith('INSERT INTO')) {
+            const match = query.match(/INSERT\s+INTO\s+(\w+)/i);
+            tableName = match ? match[1] : null;
+          } else if (trimmedQuery.startsWith('UPDATE')) {
+            const match = query.match(/UPDATE\s+(\w+)/i);
+            tableName = match ? match[1] : null;
+          } else if (trimmedQuery.startsWith('DELETE FROM')) {
+            const match = query.match(/DELETE\s+FROM\s+(\w+)/i);
+            tableName = match ? match[1] : null;
+          }
+          
+          // Map table name to model (handle both singular and plural)
+          if (tableName) {
+            // Normalize table name - remove trailing 's' if present for model lookup
+            const normalizedTableName = tableName.replace(/s$/, '');
+            
+            const tableToModel = {
+              'MenuItem': 'MenuItem',
+              'MenuItems': 'MenuItem',
+              'Order': 'Order',
+              'Orders': 'Order',
+              'OrderItem': 'OrderItem',
+              'OrderItems': 'OrderItem',
+              'Customer': 'Customer',
+              'Customers': 'Customer',
+              'Payment': 'Payment',
+              'Payments': 'Payment',
+              'Staff': 'Staff',
+              'Inventory': 'Inventory',
+              'Review': 'Review',
+              'Reviews': 'Review',
+              'User': 'User',
+              'Users': 'User'
+            };
+            
+            const modelName = tableToModel[tableName] || tableToModel[normalizedTableName] || tableName;
+            const model = models[modelName];
+            
+            if (model) {
+              // Export the affected table
+              const filenameMap = {
+                'MenuItem': 'menu',
+                'Order': 'orders',
+                'OrderItem': 'order_items',
+                'Customer': 'customers',
+                'Payment': 'payments',
+                'Staff': 'staff',
+                'Inventory': 'inventory',
+                'Review': 'reviews',
+                'User': 'authenticate'
+              };
+              const filename = filenameMap[modelName] || modelName.toLowerCase();
+              await exportModelToMarkdown(model, filename);
+              console.log(`[SQL] Exported ${filename}.md after SQL ${trimmedQuery.split(' ')[0]} on ${tableName}`);
+            } else {
+              console.warn(`[SQL] Model not found for table: ${tableName} (tried: ${modelName})`);
+            }
+          }
+        }
+      } catch (exportError) {
+        // Don't fail the query if export fails
+        console.warn('[SQL] Failed to export after SQL query:', exportError.message);
+      }
     }
 
   } catch (error) {
     console.error('SQL Query Error:', error);
+    console.error('Error Stack:', error.stack);
+    console.error('Query that failed:', query.substring(0, 200));
+    
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to execute SQL query',
-      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      query: process.env.NODE_ENV === 'development' ? query.substring(0, 200) : undefined
     });
   }
 });
@@ -225,6 +348,23 @@ router.get('/schema/:tableName', auth, async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to fetch table schema'
+    });
+  }
+});
+
+// Refresh/export all tables to markdown
+router.post('/refresh-tables', auth, async (req, res) => {
+  try {
+    await exportAllTables(models);
+    res.json({
+      success: true,
+      message: 'All tables exported to markdown files successfully'
+    });
+  } catch (error) {
+    console.error('Error refreshing tables:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to refresh tables'
     });
   }
 });
