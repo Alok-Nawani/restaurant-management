@@ -158,16 +158,16 @@ export default function Customers() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
       {/* Header */}
-      <div className="bg-white shadow-lg sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
+      <div className="bg-blue-600 text-white p-6 shadow-lg">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">👥 Customer Management</h1>
-              <p className="text-gray-600 mt-1">{filteredCustomers.length} customers registered</p>
+              <h1 className="text-4xl font-bold mb-2">👥 Customer Management</h1>
+              <p className="text-blue-100">{filteredCustomers.length} customers registered</p>
             </div>
             <button
               onClick={() => setShowForm(true)}
-              className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-full font-semibold flex items-center gap-2 transition-all duration-200 shadow-lg hover:shadow-xl"
+              className="bg-white hover:bg-blue-50 text-blue-600 px-6 py-3 rounded-xl font-semibold flex items-center gap-2 transition-all duration-200 shadow-lg hover:shadow-xl"
             >
               <PlusIcon />
               Add Customer

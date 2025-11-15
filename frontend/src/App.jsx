@@ -6,7 +6,11 @@ import Dashboard from './pages/Dashboard';
 import Orders from './pages/Orders';
 import Menu from './pages/Menu';
 import Customers from './pages/Customers';
+import Staff from './pages/Staff';
+import Inventory from './pages/Inventory';
 import Reports from './pages/Reports';
+import CustomerReviews from './pages/CustomerReviews';
+import SQLTerminal from './pages/SQLTerminal';
 import Login from './pages/Login';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
@@ -64,10 +68,38 @@ export default function App() {
             </Layout>
           </PrivateRoute>
         } />
+        <Route path="/staff" element={
+          <PrivateRoute>
+            <Layout>
+              <Staff />
+            </Layout>
+          </PrivateRoute>
+        } />
+        <Route path="/inventory" element={
+          <PrivateRoute>
+            <Layout>
+              <Inventory />
+            </Layout>
+          </PrivateRoute>
+        } />
         <Route path="/reports" element={
           <PrivateRoute>
             <Layout>
               <Reports />
+            </Layout>
+          </PrivateRoute>
+        } />
+        <Route path="/reviews" element={
+          <PrivateRoute>
+            <Layout>
+              <CustomerReviews />
+            </Layout>
+          </PrivateRoute>
+        } />
+        <Route path="/sql" element={
+          <PrivateRoute>
+            <Layout>
+              <SQLTerminal />
             </Layout>
           </PrivateRoute>
         } />

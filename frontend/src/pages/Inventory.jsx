@@ -1,701 +1,489 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import { api } from '../api/api';
 import toast from 'react-hot-toast';
+import { useForm } from 'react-hook-form';
+
+// Icons
+const PackageIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+  </svg>
+);
+
+const AlertIcon = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+  </svg>
+);
+
+const SearchIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+  </svg>
+);
+
+const DollarIcon = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+  </svg>
+);
+
+const BuildingIcon = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+  </svg>
+);
+
+const EditIcon = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+  </svg>
+);
 
 export default function Inventory() {
+  const { user } = useAuth();
   const [inventory, setInventory] = useState([]);
+  const [filteredInventory, setFilteredInventory] = useState([]);
+  const [stats, setStats] = useState({});
+  const [lowStockAlerts, setLowStockAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [editingItem, setEditingItem] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
   const [showLowStock, setShowLowStock] = useState(false);
-  const [stats, setStats] = useState(null);
-  const [lowStockAlerts, setLowStockAlerts] = useState([]);
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
+  const { register, handleSubmit, reset } = useForm();
 
-  const [formData, setFormData] = useState({
-    name: '',
-    category: 'furniture',
-    subcategory: '',
-    currentStock: 0,
-    minimumStock: 1,
-    maximumStock: '',
-    unit: 'pieces',
-    unitPrice: '',
-    supplier: '',
-    supplierContact: '',
-    location: '',
-    description: '',
-    alertEnabled: true
-  });
-
-  useEffect(() => {
-    loadInventory();
-    loadStats();
-    loadLowStockAlerts();
-  }, []);
-
-  const loadInventory = async () => {
+  async function loadInventory() {
     try {
       setLoading(true);
-      const response = await api.getInventory();
-      setInventory(response.inventory || response.data?.inventory || response || []);
+      const [inventoryData, statsData, alertsData] = await Promise.all([
+        api.getInventory(),
+        api.getInventoryStats(),
+        api.getLowStockAlerts()
+      ]);
+      const inventoryArray = Array.isArray(inventoryData) ? inventoryData : (inventoryData.data || inventoryData.inventory || []);
+      setInventory(inventoryArray);
+      setFilteredInventory(inventoryArray);
+      setStats(statsData.data || statsData);
+      setLowStockAlerts(alertsData || []);
     } catch (error) {
       console.error('Error loading inventory:', error);
       toast.error('Failed to load inventory data');
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const loadStats = async () => {
-    try {
-      const response = await api.getInventoryStats();
-      setStats(response.data || response);
-    } catch (error) {
-      console.error('Error loading inventory stats:', error);
+  // Filter inventory based on search term and category
+  useEffect(() => {
+    let filtered = inventory;
+
+    if (searchTerm) {
+      filtered = filtered.filter(item =>
+        item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.supplier?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
     }
-  };
 
-  const loadLowStockAlerts = async () => {
-    try {
-      const response = await api.getLowStockAlerts();
-      setLowStockAlerts(response || response.data || []);
-    } catch (error) {
-      console.error('Error loading low stock alerts:', error);
+    if (categoryFilter) {
+      filtered = filtered.filter(item => item.category === categoryFilter);
     }
-  };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      setLoading(true);
-      
-      const submitData = {
-        ...formData,
-        maximumStock: formData.maximumStock ? parseInt(formData.maximumStock) : null,
-        unitPrice: formData.unitPrice ? parseFloat(formData.unitPrice) : null
-      };
-      
-      if (editingItem) {
-        await api.updateInventory(editingItem.id, submitData);
-        toast.success('Inventory item updated successfully!');
-      } else {
-        await api.createInventory(submitData);
-        toast.success('Inventory item added successfully!');
-      }
-      
-      setShowForm(false);
-      setEditingItem(null);
-      resetForm();
+    if (showLowStock) {
+      filtered = filtered.filter(item => item.currentStock <= item.minimumStock);
+    }
+
+    setFilteredInventory(filtered);
+  }, [searchTerm, categoryFilter, showLowStock, inventory]);
+
+  useEffect(() => {
+    if (user) {
       loadInventory();
-      loadStats();
-      loadLowStockAlerts();
-    } catch (error) {
-      console.error('Error saving inventory:', error);
-      toast.error(error.message || 'Failed to save inventory item');
-    } finally {
+    } else {
       setLoading(false);
+    }
+  }, [user]);
+
+  const getCategoryColor = (category) => {
+    const colors = {
+      'Furniture': 'bg-brown-100 text-brown-800',
+      'Kitchen Equipment': 'bg-red-100 text-red-800',
+      'Food Supplies': 'bg-green-100 text-green-800',
+      'Cleaning Supplies': 'bg-blue-100 text-blue-800',
+      'Utensils': 'bg-gray-100 text-gray-800',
+      'Electronics': 'bg-purple-100 text-purple-800',
+      'Decorations': 'bg-pink-100 text-pink-800',
+      'Maintenance': 'bg-yellow-100 text-yellow-800'
+    };
+    return colors[category] || 'bg-gray-100 text-gray-800';
+  };
+
+  const getCategoryIcon = (category) => {
+    const icons = {
+      'Furniture': '🪑',
+      'Kitchen Equipment': '🍳',
+      'Food Supplies': '🥘',
+      'Cleaning Supplies': '🧽',
+      'Utensils': '🍴',
+      'Electronics': '📱',
+      'Decorations': '🎨',
+      'Maintenance': '🔧'
+    };
+    return icons[category] || '📦';
+  };
+
+  const getStockStatus = (currentStock, minimumStock) => {
+    if (currentStock <= minimumStock) {
+      return { status: 'Low Stock', color: 'bg-red-100 text-red-800' };
+    } else if (currentStock <= minimumStock * 1.5) {
+      return { status: 'Medium Stock', color: 'bg-yellow-100 text-yellow-800' };
+    } else {
+      return { status: 'In Stock', color: 'bg-green-100 text-green-800' };
     }
   };
 
   const handleEdit = (item) => {
     setEditingItem(item);
-    setFormData({
-      name: item.name,
-      category: item.category,
-      subcategory: item.subcategory || '',
+    reset({
       currentStock: item.currentStock,
       minimumStock: item.minimumStock,
-      maximumStock: item.maximumStock || '',
-      unit: item.unit,
-      unitPrice: item.unitPrice || '',
-      supplier: item.supplier || '',
-      supplierContact: item.supplierContact || '',
-      location: item.location || '',
-      description: item.description || '',
-      alertEnabled: item.alertEnabled
+      price: item.price,
+      supplier: item.supplier || ''
     });
-    setShowForm(true);
+    setShowEditForm(true);
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to deactivate this inventory item?')) {
-      try {
-        setLoading(true);
-        await api.deleteInventory(id);
-        toast.success('Inventory item deactivated successfully!');
-        loadInventory();
-        loadStats();
-        loadLowStockAlerts();
-      } catch (error) {
-        console.error('Error deactivating inventory:', error);
-        toast.error('Failed to deactivate inventory item');
-      } finally {
-        setLoading(false);
-      }
-    }
-  };
-
-  const handleStockUpdate = async (id, operation, quantity) => {
+  const onSubmit = async (data) => {
     try {
-      setLoading(true);
-      await api.updateStock(id, { operation, quantity });
-      toast.success('Stock updated successfully!');
+      await api.updateInventoryItem(editingItem.id, data);
+      toast.success('Inventory item updated successfully!');
+      setShowEditForm(false);
+      setEditingItem(null);
+      reset();
       loadInventory();
-      loadLowStockAlerts();
     } catch (error) {
-      console.error('Error updating stock:', error);
-      toast.error('Failed to update stock');
-    } finally {
-      setLoading(false);
+      console.error('Error updating inventory item:', error);
+      toast.error('Failed to update inventory item');
     }
   };
 
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      category: 'furniture',
-      subcategory: '',
-      currentStock: 0,
-      minimumStock: 1,
-      maximumStock: '',
-      unit: 'pieces',
-      unitPrice: '',
-      supplier: '',
-      supplierContact: '',
-      location: '',
-      description: '',
-      alertEnabled: true
-    });
+  const handleCloseForm = () => {
+    setShowEditForm(false);
+    setEditingItem(null);
+    reset();
   };
 
-  const filteredInventory = inventory.filter(item => {
-    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.supplier?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = !categoryFilter || item.category === categoryFilter;
-    const matchesStatus = statusFilter === 'all' || 
-                         (statusFilter === 'active' && item.isActive) ||
-                         (statusFilter === 'inactive' && !item.isActive);
-    const matchesLowStock = !showLowStock || (item.currentStock <= item.minimumStock && item.alertEnabled);
-    
-    return matchesSearch && matchesCategory && matchesStatus && matchesLowStock;
-  });
+  const uniqueCategories = [...new Set(inventory.map(item => item.category))];
 
-  const getCategoryIcon = (category) => {
-    const icons = {
-      furniture: '🪑',
-      kitchen_equipment: '🍳',
-      food_supplies: '🥘',
-      cleaning_supplies: '🧽',
-      utensils: '🍴',
-      electronics: '📱',
-      decorations: '🎨',
-      maintenance: '🔧',
-      other: '📦'
-    };
-    return icons[category] || '📦';
-  };
-
-  const getCategoryColor = (category) => {
-    const colors = {
-      furniture: 'bg-amber-100 text-amber-800',
-      kitchen_equipment: 'bg-red-100 text-red-800',
-      food_supplies: 'bg-green-100 text-green-800',
-      cleaning_supplies: 'bg-blue-100 text-blue-800',
-      utensils: 'bg-gray-100 text-gray-800',
-      electronics: 'bg-purple-100 text-purple-800',
-      decorations: 'bg-pink-100 text-pink-800',
-      maintenance: 'bg-yellow-100 text-yellow-800',
-      other: 'bg-gray-100 text-gray-800'
-    };
-    return colors[category] || 'bg-gray-100 text-gray-800';
-  };
-
-  const isLowStock = (item) => {
-    return item.currentStock <= item.minimumStock && item.alertEnabled;
-  };
-
-  if (loading && inventory.length === 0) {
+  if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-cyan-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-cyan-600 mx-auto mb-4"></div>
+          <p className="text-cyan-600 font-medium">Loading Inventory Data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-cyan-50 flex items-center justify-center">
+        <div className="text-center bg-white p-8 rounded-xl shadow-lg">
+          <div className="text-6xl mb-4">📦</div>
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">Inventory Management</h2>
+          <p className="text-gray-600 mb-6">Please log in to manage inventory</p>
+          <a 
+            href="/login" 
+            className="bg-cyan-600 hover:bg-cyan-700 text-white px-8 py-3 rounded-lg font-medium transition-colors"
+          >
+            Go to Login
+          </a>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6">
+    <div className="min-h-screen bg-cyan-50">
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Inventory Management</h1>
-          <p className="text-gray-600">Manage your restaurant inventory and supplies</p>
+      <div className="bg-cyan-600 text-white p-6 shadow-lg">
+        <div className="max-w-7xl mx-auto">
+          <h1 className="text-4xl font-bold mb-2">📦 Inventory Management</h1>
+          <p className="text-cyan-100">Track stock levels and manage restaurant supplies</p>
         </div>
-        <button
-          onClick={() => {
-            setShowForm(true);
-            setEditingItem(null);
-            resetForm();
-          }}
-          className="btn-primary"
-        >
-          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-          </svg>
-          Add Item
-        </button>
       </div>
 
-      {/* Low Stock Alerts */}
-      {lowStockAlerts.length > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-          <div className="flex items-center">
-            <svg className="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
-            <div>
-              <h3 className="text-sm font-medium text-red-800">
-                Low Stock Alert - {lowStockAlerts.length} items need restocking
-              </h3>
-              <p className="text-sm text-red-600 mt-1">
-                {lowStockAlerts.slice(0, 3).map(item => item.name).join(', ')}
-                {lowStockAlerts.length > 3 && ` and ${lowStockAlerts.length - 3} more...`}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Stats Cards */}
-      {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-          <div className="bg-white p-6 rounded-lg shadow">
+      <div className="max-w-7xl mx-auto p-6">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 border border-cyan-200">
             <div className="flex items-center">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                </svg>
+              <div className="p-3 bg-cyan-100 rounded-xl">
+                <PackageIcon />
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Total Items</p>
-                <p className="text-2xl font-semibold text-gray-900">{stats.totalItems}</p>
+                <p className="text-3xl font-bold text-gray-900">{stats.totalItems || 0}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow">
+          <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 border border-cyan-200">
             <div className="flex items-center">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+              <div className="p-3 bg-red-100 rounded-xl">
+                <AlertIcon />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Low Stock Items</p>
+                <p className="text-3xl font-bold text-gray-900">{stats.lowStockCount || 0}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 border border-cyan-200">
+            <div className="flex items-center">
+              <div className="p-3 bg-green-100 rounded-xl">
+                <PackageIcon />
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Active Items</p>
-                <p className="text-2xl font-semibold text-gray-900">{stats.activeItems}</p>
+                <p className="text-3xl font-bold text-gray-900">{stats.activeItems || 0}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow">
+          <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 border border-cyan-200">
             <div className="flex items-center">
-              <div className="p-2 bg-red-100 rounded-lg">
-                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Low Stock</p>
-                <p className="text-2xl font-semibold text-gray-900">{stats.lowStockCount}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow">
-            <div className="flex items-center">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                </svg>
+              <div className="p-3 bg-blue-100 rounded-xl">
+                <DollarIcon />
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Total Value</p>
-                <p className="text-2xl font-semibold text-gray-900">
-                  ₹{stats.totalValue ? Math.round(stats.totalValue).toLocaleString() : '0'}
-                </p>
+                <p className="text-3xl font-bold text-gray-900">₹{stats.totalValue || 0}</p>
               </div>
             </div>
           </div>
         </div>
-      )}
 
-      {/* Filters */}
-      <div className="bg-white p-4 rounded-lg shadow mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
-            <input
-              type="text"
-              placeholder="Search items..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+        {/* Search and Filter */}
+        <div className="mb-8">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="relative flex-1">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <SearchIcon />
+              </div>
+              <input
+                type="text"
+                placeholder="Search inventory by name, category, or supplier..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent shadow-sm"
+              />
+            </div>
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent shadow-sm"
             >
               <option value="">All Categories</option>
-              <option value="furniture">Furniture</option>
-              <option value="kitchen_equipment">Kitchen Equipment</option>
-              <option value="food_supplies">Food Supplies</option>
-              <option value="cleaning_supplies">Cleaning Supplies</option>
-              <option value="utensils">Utensils</option>
-              <option value="electronics">Electronics</option>
-              <option value="decorations">Decorations</option>
-              <option value="maintenance">Maintenance</option>
-              <option value="other">Other</option>
+              {uniqueCategories.map(category => (
+                <option key={category} value={category}>{category}</option>
+              ))}
             </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">All Status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-          </div>
-          <div className="flex items-end">
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={showLowStock}
-                onChange={(e) => setShowLowStock(e.target.checked)}
-                className="rounded border-gray-300 text-red-600 shadow-sm focus:border-red-300 focus:ring focus:ring-red-200 focus:ring-opacity-50"
-              />
-              <span className="ml-2 text-sm text-gray-700">Low Stock Only</span>
-            </label>
-          </div>
-          <div className="flex items-end">
             <button
-              onClick={() => {
-                setSearchTerm('');
-                setCategoryFilter('');
-                setStatusFilter('all');
-                setShowLowStock(false);
-              }}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+              onClick={() => setShowLowStock(!showLowStock)}
+              className={`px-6 py-3 rounded-xl font-medium transition-colors ${
+                showLowStock 
+                  ? 'bg-red-500 text-white' 
+                  : 'bg-white text-red-600 border border-red-300 hover:bg-red-50'
+              }`}
             >
-              Clear Filters
+              {showLowStock ? 'Show All' : 'Low Stock Only'}
             </button>
           </div>
         </div>
-      </div>
 
-      {/* Inventory List */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">
-            Inventory Items ({filteredInventory.length})
-          </h3>
-        </div>
-        <div className="divide-y divide-gray-200">
-          {filteredInventory.map((item) => (
-            <div key={item.id} className="p-6 hover:bg-gray-50">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="flex-shrink-0">
-                    <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
-                      <span className="text-2xl">{getCategoryIcon(item.category)}</span>
+        {/* Low Stock Alerts */}
+        {lowStockAlerts.length > 0 && (
+          <div className="mb-8 bg-red-50 border border-red-200 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-red-800 mb-4 flex items-center gap-2">
+              <AlertIcon />
+              Low Stock Alerts
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {lowStockAlerts.slice(0, 6).map(item => (
+                <div key={item.id} className="bg-white p-4 rounded-lg border border-red-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-gray-900">{item.name}</p>
+                      <p className="text-sm text-gray-600">{item.category}</p>
                     </div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center space-x-2">
-                      <h4 className="text-lg font-medium text-gray-900 truncate">
-                        {item.name}
-                      </h4>
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getCategoryColor(item.category)}`}>
-                        {item.category.replace('_', ' ').toUpperCase()}
-                      </span>
-                      {isLowStock(item) && (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                          Low Stock
-                        </span>
-                      )}
-                      {item.isActive ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          Active
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                          Inactive
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-1 text-sm text-gray-500">
-                      <p>
-                        Stock: {item.currentStock} {item.unit} 
-                        {item.minimumStock && ` (Min: ${item.minimumStock})`}
-                        {item.unitPrice && ` • ₹${item.unitPrice}/${item.unit}`}
-                      </p>
-                      {item.supplier && <p>Supplier: {item.supplier}</p>}
-                      {item.location && <p>Location: {item.location}</p>}
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-red-600">{item.currentStock} left</p>
+                      <p className="text-xs text-gray-500">Min: {item.minimumStock}</p>
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  {/* Stock Update Buttons */}
-                  <div className="flex items-center space-x-1">
-                    <button
-                      onClick={() => handleStockUpdate(item.id, 'subtract', 1)}
-                      className="p-1 text-gray-400 hover:text-red-600"
-                      title="Decrease Stock"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                      </svg>
-                    </button>
-                    <span className="text-sm font-medium text-gray-900 min-w-[2rem] text-center">
-                      {item.currentStock}
-                    </span>
-                    <button
-                      onClick={() => handleStockUpdate(item.id, 'add', 1)}
-                      className="p-1 text-gray-400 hover:text-green-600"
-                      title="Increase Stock"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                      </svg>
-                    </button>
-                  </div>
-                  
-                  <button
-                    onClick={() => handleEdit(item)}
-                    className="p-2 text-gray-400 hover:text-blue-600"
-                    title="Edit"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={() => handleDelete(item.id)}
-                    className="p-2 text-gray-400 hover:text-red-600"
-                    title="Deactivate"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Add/Edit Form Modal */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-semibold text-gray-900">
-                  {editingItem ? 'Edit Inventory Item' : 'Add New Inventory Item'}
-                </h3>
-                <button
-                  onClick={() => {
-                    setShowForm(false);
-                    setEditingItem(null);
-                    resetForm();
-                  }}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.name}
-                      onChange={(e) => setFormData({...formData, name: e.target.value})}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Category *</label>
-                    <select
-                      required
-                      value={formData.category}
-                      onChange={(e) => setFormData({...formData, category: e.target.value})}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="furniture">Furniture</option>
-                      <option value="kitchen_equipment">Kitchen Equipment</option>
-                      <option value="food_supplies">Food Supplies</option>
-                      <option value="cleaning_supplies">Cleaning Supplies</option>
-                      <option value="utensils">Utensils</option>
-                      <option value="electronics">Electronics</option>
-                      <option value="decorations">Decorations</option>
-                      <option value="maintenance">Maintenance</option>
-                      <option value="other">Other</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Subcategory</label>
-                    <input
-                      type="text"
-                      value={formData.subcategory}
-                      onChange={(e) => setFormData({...formData, subcategory: e.target.value})}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
-                    <input
-                      type="text"
-                      value={formData.unit}
-                      onChange={(e) => setFormData({...formData, unit: e.target.value})}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="pieces, kg, liters, etc."
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Current Stock *</label>
-                    <input
-                      type="number"
-                      min="0"
-                      required
-                      value={formData.currentStock}
-                      onChange={(e) => setFormData({...formData, currentStock: parseInt(e.target.value)})}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Minimum Stock *</label>
-                    <input
-                      type="number"
-                      min="0"
-                      required
-                      value={formData.minimumStock}
-                      onChange={(e) => setFormData({...formData, minimumStock: parseInt(e.target.value)})}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Maximum Stock</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={formData.maximumStock}
-                      onChange={(e) => setFormData({...formData, maximumStock: e.target.value})}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Unit Price (₹)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={formData.unitPrice}
-                      onChange={(e) => setFormData({...formData, unitPrice: e.target.value})}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
-                    <input
-                      type="text"
-                      value={formData.supplier}
-                      onChange={(e) => setFormData({...formData, supplier: e.target.value})}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Supplier Contact</label>
-                    <input
-                      type="text"
-                      value={formData.supplierContact}
-                      onChange={(e) => setFormData({...formData, supplierContact: e.target.value})}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
-                    <input
-                      type="text"
-                      value={formData.location}
-                      onChange={(e) => setFormData({...formData, location: e.target.value})}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                  <textarea
-                    value={formData.description}
-                    onChange={(e) => setFormData({...formData, description: e.target.value})}
-                    rows="3"
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="alertEnabled"
-                    checked={formData.alertEnabled}
-                    onChange={(e) => setFormData({...formData, alertEnabled: e.target.checked})}
-                    className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
-                  />
-                  <label htmlFor="alertEnabled" className="ml-2 text-sm text-gray-700">
-                    Enable low stock alerts
-                  </label>
-                </div>
-
-                <div className="flex justify-end space-x-4 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowForm(false);
-                      setEditingItem(null);
-                      resetForm();
-                    }}
-                    className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="btn-primary px-6 py-2 disabled:opacity-50"
-                  >
-                    {loading ? 'Saving...' : (editingItem ? 'Update' : 'Add')}
-                  </button>
-                </div>
-              </form>
+              ))}
             </div>
           </div>
+        )}
+
+        {/* Inventory Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {filteredInventory.length === 0 ? (
+            <div className="col-span-full text-center py-12">
+              <div className="text-6xl mb-4">📦</div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                {searchTerm || categoryFilter || showLowStock ? 'No items found' : 'No inventory items yet'}
+              </h3>
+              <p className="text-gray-600">
+                {searchTerm || categoryFilter || showLowStock ? 'Try adjusting your search criteria' : 'Inventory items will appear here once added'}
+              </p>
+            </div>
+          ) : (
+            filteredInventory.map(item => {
+              const stockStatus = getStockStatus(item.currentStock, item.minimumStock);
+              return (
+                <div key={item.id} className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 hover:border-cyan-200 group">
+                  {/* Item Header */}
+                  <div className="h-32 bg-gradient-to-br from-cyan-100 to-blue-100 flex items-center justify-center relative">
+                    <div className="w-16 h-16 bg-cyan-500 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg">
+                      {getCategoryIcon(item.category)}
+                    </div>
+                  </div>
+
+                  <div className="p-6">
+                    <div className="mb-3">
+                      <h3 className="text-lg font-bold text-gray-900 group-hover:text-cyan-600 transition-colors">
+                        {item.name}
+                      </h3>
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getCategoryColor(item.category)}`}>
+                        {item.category}
+                      </span>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Current Stock:</span>
+                        <span className="text-sm font-semibold text-gray-900">{item.currentStock} {item.unit}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Minimum Stock:</span>
+                        <span className="text-sm text-gray-900">{item.minimumStock} {item.unit}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Price:</span>
+                        <span className="text-sm font-semibold text-green-600">₹{item.price}</span>
+                      </div>
+                      {item.supplier && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-600">Supplier:</span>
+                          <span className="text-sm text-gray-900">{item.supplier}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-gray-100">
+                      <div className="flex justify-between items-center">
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${stockStatus.color}`}>
+                          {stockStatus.status}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleEdit(item)}
+                            className="text-cyan-600 hover:text-cyan-800 p-2 rounded-lg hover:bg-cyan-50 transition-colors"
+                            title="Edit inventory item"
+                          >
+                            <EditIcon />
+                          </button>
+                          <span className="text-xs text-gray-500">
+                            ID: {item.id}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      {/* Edit Inventory Item Form Modal */}
+      {showEditForm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <form 
+            onSubmit={handleSubmit(onSubmit)}
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+          >
+            <div className="bg-cyan-500 text-white p-6">
+              <h3 className="text-xl font-bold">Update Inventory Item</h3>
+              <p className="text-cyan-100 text-sm">{editingItem?.name}</p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-700">Current Stock</label>
+                <input
+                  type="number"
+                  min="0"
+                  {...register('currentStock', { required: true, min: 0 })}
+                  className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  placeholder="Enter current stock"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-700">Minimum Stock</label>
+                <input
+                  type="number"
+                  min="0"
+                  {...register('minimumStock', { required: true, min: 0 })}
+                  className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  placeholder="Enter minimum stock"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-700">Price (₹)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  {...register('price', { required: true, min: 0 })}
+                  className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  placeholder="Enter price"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-700">Supplier (Optional)</label>
+                <input
+                  type="text"
+                  {...register('supplier')}
+                  className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  placeholder="Enter supplier name"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 p-6 bg-gray-50">
+              <button
+                type="submit"
+                className="flex-1 bg-cyan-500 hover:bg-cyan-600 text-white py-3 rounded-xl font-semibold transition-colors"
+              >
+                Update Item
+              </button>
+              <button
+                type="button"
+                onClick={handleCloseForm}
+                className="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-3 rounded-xl font-semibold transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>

@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { sequelize } = require('../models');
 
 function ensureOutputDir() {
   const outDir = path.join(__dirname, '..', 'data_tables');
@@ -45,8 +46,88 @@ function formatCell(value) {
 async function exportModelToMarkdown(model, filename) {
   const outDir = ensureOutputDir();
   const filePath = path.join(outDir, `${filename}.md`);
-  const rows = await model.findAll({ raw: true });
-  const content = `# ${filename}\n\n${toMarkdownTable(rows)}\n`;
+  
+  // Get model data with appropriate includes for better relationships
+  let rows;
+  try {
+    if (filename === 'orders') {
+      rows = await model.findAll({ 
+        include: [
+          { model: sequelize.models.Customer, attributes: ['id', 'name', 'email'] },
+          { model: sequelize.models.OrderItem, include: [{ model: sequelize.models.MenuItem, attributes: ['name', 'price'] }] }
+        ],
+        raw: false 
+      });
+      // Convert to plain objects for table formatting
+      rows = rows.map(row => ({
+        id: row.id,
+        tableNumber: row.tableNumber,
+        status: row.status,
+        total: row.total,
+        customer: row.Customer ? `${row.Customer.name} (${row.Customer.email})` : 'Walk-in',
+        items: row.OrderItems ? row.OrderItems.map(item => `${item.MenuItem.name} x${item.quantity}`).join(', ') : '',
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt
+      }));
+    } else if (filename === 'order_items') {
+      rows = await model.findAll({ 
+        include: [
+          { model: sequelize.models.Order, attributes: ['id', 'tableNumber'] },
+          { model: sequelize.models.MenuItem, attributes: ['name', 'price'] }
+        ],
+        raw: false 
+      });
+      rows = rows.map(row => ({
+        id: row.id,
+        orderId: row.orderId,
+        orderTable: row.Order ? `Order #${row.Order.id} (Table ${row.Order.tableNumber})` : `Order #${row.orderId}`,
+        menuItem: row.MenuItem ? row.MenuItem.name : `Item #${row.menuItemId}`,
+        quantity: row.quantity,
+        price: row.price,
+        total: row.quantity * row.price,
+        createdAt: row.createdAt
+      }));
+    } else if (filename === 'payments') {
+      rows = await model.findAll({ 
+        include: [
+          { model: sequelize.models.Order, attributes: ['id', 'tableNumber', 'total'] }
+        ],
+        raw: false 
+      });
+      rows = rows.map(row => ({
+        id: row.id,
+        orderId: row.orderId,
+        orderInfo: row.Order ? `Order #${row.Order.id} (Table ${row.Order.tableNumber})` : `Order #${row.orderId}`,
+        amount: row.amount,
+        method: row.method,
+        status: row.status,
+        createdAt: row.createdAt
+      }));
+    } else if (filename === 'reviews') {
+      rows = await model.findAll({ 
+        include: [
+          { model: sequelize.models.Customer, attributes: ['name', 'email'] },
+          { model: sequelize.models.Order, attributes: ['id', 'tableNumber'] }
+        ],
+        raw: false 
+      });
+      rows = rows.map(row => ({
+        id: row.id,
+        customer: row.Customer ? `${row.Customer.name} (${row.Customer.email})` : 'Anonymous',
+        order: row.Order ? `Order #${row.Order.id} (Table ${row.Order.tableNumber})` : `Order #${row.orderId}`,
+        rating: row.rating,
+        comment: row.comment,
+        createdAt: row.createdAt
+      }));
+    } else {
+      rows = await model.findAll({ raw: true });
+    }
+  } catch (error) {
+    console.error(`Error fetching data for ${filename}:`, error.message);
+    rows = await model.findAll({ raw: true });
+  }
+  
+  const content = `# ${filename.charAt(0).toUpperCase() + filename.slice(1)}\n\n**Last Updated:** ${new Date().toLocaleString()}\n\n**Total Records:** ${rows.length}\n\n${toMarkdownTable(rows)}\n`;
   fs.writeFileSync(filePath, content, 'utf8');
 }
 

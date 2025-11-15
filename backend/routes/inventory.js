@@ -380,4 +380,40 @@ router.get('/stats/overview', async (req, res) => {
   }
 });
 
+// Update inventory item
+router.patch('/:id', [
+  body('currentStock').optional().isInt({ min: 0 }).withMessage('Current stock must be a non-negative integer'),
+  body('minimumStock').optional().isInt({ min: 0 }).withMessage('Minimum stock must be a non-negative integer'),
+  body('price').optional().isFloat({ min: 0 }).withMessage('Price must be a non-negative number'),
+  body('supplier').optional().isString().withMessage('Supplier must be a string'),
+  body('isActive').optional().isBoolean().withMessage('isActive must be a boolean')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { id } = req.params;
+    const updateData = req.body;
+
+    const inventoryItem = await Inventory.findByPk(id);
+    if (!inventoryItem) {
+      return res.status(404).json({ message: 'Inventory item not found' });
+    }
+
+    // Update the item
+    await inventoryItem.update(updateData);
+
+    res.json({ 
+      success: true, 
+      message: 'Inventory item updated successfully',
+      data: inventoryItem 
+    });
+  } catch (error) {
+    console.error('Error updating inventory item:', error);
+    res.status(500).json({ message: 'Failed to update inventory item', error: error.message });
+  }
+});
+
 module.exports = router;

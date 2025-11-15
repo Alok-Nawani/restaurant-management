@@ -9,6 +9,14 @@ export default function OrderForm({ onClose }) {
   const [customerId, setCustomerId] = useState('');
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(false);
+  
+  // Customer creation fields
+  const [customerOption, setCustomerOption] = useState('existing'); // 'existing' or 'new'
+  const [newCustomer, setNewCustomer] = useState({
+    name: '',
+    phone: '',
+    email: ''
+  });
 
   useEffect(() => {
     loadData();
@@ -71,12 +79,37 @@ export default function OrderForm({ onClose }) {
       toast.error('Please add at least one item');
       return;
     }
+    if (customerOption === 'new') {
+      if (!newCustomer.name.trim()) {
+        toast.error('Please enter customer name');
+        return;
+      }
+      if (!newCustomer.phone.trim()) {
+        toast.error('Please enter customer phone number');
+        return;
+      }
+    }
 
     try {
       setLoading(true);
+      
+      let finalCustomerId = customerId;
+      
+      // Create new customer if needed
+      if (customerOption === 'new') {
+        const createdCustomer = await api.createCustomer({
+          name: newCustomer.name.trim(),
+          phone: newCustomer.phone.trim(),
+          email: newCustomer.email.trim() || null
+        });
+        finalCustomerId = createdCustomer.id;
+        toast.success('Customer created successfully!');
+      }
+      
+      // Create order
       await api.createOrder({
         tableNumber: tableNumber.trim(),
-        customerId: customerId || null,
+        customerId: finalCustomerId || null,
         items
       });
       toast.success('Order created successfully!');
@@ -109,33 +142,111 @@ export default function OrderForm({ onClose }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Table Number
+                Table Number *
               </label>
               <input
-                type="number"
+                type="text"
                 value={tableNumber}
                 onChange={(e) => setTableNumber(e.target.value)}
                 className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Enter table number"
+                placeholder="e.g., Table 5, A1, etc."
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Customer (Optional)
+          </div>
+
+          {/* Customer Selection */}
+          <div className="mb-6">
+            <h4 className="text-lg font-medium text-gray-900 mb-4">Customer Information</h4>
+            
+            {/* Customer Option Toggle */}
+            <div className="flex space-x-4 mb-4">
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="customerOption"
+                  value="existing"
+                  checked={customerOption === 'existing'}
+                  onChange={(e) => setCustomerOption(e.target.value)}
+                  className="mr-2"
+                />
+                <span className="text-sm font-medium text-gray-700">Select Existing Customer</span>
               </label>
-              <select
-                value={customerId}
-                onChange={(e) => setCustomerId(e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Select customer</option>
-                {customers && customers.length > 0 && customers.map(customer => (
-                  <option key={customer.id} value={customer.id}>
-                    {customer.name} - {customer.phone}
-                  </option>
-                ))}
-              </select>
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="customerOption"
+                  value="new"
+                  checked={customerOption === 'new'}
+                  onChange={(e) => setCustomerOption(e.target.value)}
+                  className="mr-2"
+                />
+                <span className="text-sm font-medium text-gray-700">Create New Customer</span>
+              </label>
             </div>
+
+            {/* Existing Customer Selection */}
+            {customerOption === 'existing' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Customer
+                </label>
+                <select
+                  value={customerId}
+                  onChange={(e) => setCustomerId(e.target.value)}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Choose from existing customers</option>
+                  {customers && customers.length > 0 && customers.map(customer => (
+                    <option key={customer.id} value={customer.id}>
+                      {customer.name} - {customer.phone}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">Leave empty for walk-in customer</p>
+              </div>
+            )}
+
+            {/* New Customer Form */}
+            {customerOption === 'new' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Customer Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={newCustomer.name}
+                    onChange={(e) => setNewCustomer({...newCustomer, name: e.target.value})}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter customer name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Phone Number *
+                  </label>
+                  <input
+                    type="tel"
+                    value={newCustomer.phone}
+                    onChange={(e) => setNewCustomer({...newCustomer, phone: e.target.value})}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter phone number"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Email (Optional)
+                  </label>
+                  <input
+                    type="email"
+                    value={newCustomer.email}
+                    onChange={(e) => setNewCustomer({...newCustomer, email: e.target.value})}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter email address"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Menu Items */}

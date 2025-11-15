@@ -30,38 +30,45 @@ export default function Reports() {
   const loadReports = async () => {
     try {
       setLoading(true);
+      // Get all orders without pagination limit
       const [ordersData, staffData, inventoryData, customersData, reviewsData] = await Promise.all([
-        api.getOrders(),
+        api.getOrders({ limit: 1000 }),
         api.getStaffStats(),
         api.getInventoryStats(),
         api.getCustomers(),
         api.getReviewStats()
       ]);
 
+      const orders = ordersData.orders || ordersData || [];
+      
       // Calculate revenue from orders
-      const revenue = ordersData.orders?.reduce((total, order) => {
+      const revenue = orders.reduce((total, order) => {
         return total + (order.total || 0);
-      }, 0) || 0;
+      }, 0);
 
       // Calculate orders by status
-      const ordersByStatus = ordersData.orders?.reduce((acc, order) => {
-        acc[order.status] = (acc[order.status] || 0) + 1;
+      const ordersByStatus = orders.reduce((acc, order) => {
+        const status = (order.status || 'PENDING').toUpperCase();
+        acc[status] = (acc[status] || 0) + 1;
         return acc;
-      }, {}) || {};
+      }, {});
 
       // Calculate orders by day (last 7 days)
-      const ordersByDay = ordersData.orders?.reduce((acc, order) => {
+      const ordersByDay = orders.reduce((acc, order) => {
         const date = new Date(order.createdAt).toISOString().split('T')[0];
         acc[date] = (acc[date] || 0) + 1;
         return acc;
-      }, {}) || {};
+      }, {});
 
-      // Calculate top menu items
+      // Calculate top menu items - handle both OrderItems array and nested structure
       const menuItemCounts = {};
-      ordersData.orders?.forEach(order => {
-        order.OrderItems?.forEach(item => {
-          const menuItemName = item.MenuItem?.name || 'Unknown';
-          menuItemCounts[menuItemName] = (menuItemCounts[menuItemName] || 0) + item.qty;
+      orders.forEach(order => {
+        const orderItems = order.OrderItems || order.orderItems || [];
+        orderItems.forEach(item => {
+          const menuItem = item.MenuItem || item.menuItem || {};
+          const menuItemName = menuItem.name || item.name || 'Unknown';
+          const quantity = item.quantity || item.qty || 1;
+          menuItemCounts[menuItemName] = (menuItemCounts[menuItemName] || 0) + quantity;
         });
       });
 
@@ -80,14 +87,14 @@ export default function Reports() {
 
       setReports({
         orders: {
-          total: ordersData.orders?.length || 0,
+          total: orders.length,
           byStatus: ordersByStatus,
           byDay: ordersByDay,
           topItems: topMenuItems
         },
         revenue: {
           total: revenue,
-          average: ordersData.orders?.length > 0 ? revenue / ordersData.orders.length : 0
+          average: orders.length > 0 ? revenue / orders.length : 0
         },
         staff: staffData,
         inventory: inventoryData,
@@ -95,7 +102,7 @@ export default function Reports() {
           total: totalCustomers,
           new: newCustomers
         },
-        reviews: reviewsData
+        reviews: reviewsData?.data || reviewsData
       });
     } catch (error) {
       console.error('Error loading reports:', error);
@@ -124,11 +131,35 @@ export default function Reports() {
     }).format(amount);
   };
 
-  // Prepare data for charts
-  const statusChartData = Object.entries(reports.orders?.byStatus || {}).map(([status, count]) => ({
-    status: status.charAt(0).toUpperCase() + status.slice(1),
-    count
-  }));
+  // Prepare chart data
+  const statusChartData = reports.orders?.byStatus && Object.keys(reports.orders.byStatus).length > 0 
+    ? Object.entries(reports.orders.byStatus).map(([status, count]) => ({
+        status: status.charAt(0).toUpperCase() + status.slice(1).toLowerCase(),
+        count: count
+      }))
+    : [
+        { status: 'Pending', count: 0 },
+        { status: 'Confirmed', count: 0 },
+        { status: 'Preparing', count: 0 },
+        { status: 'Ready', count: 0 },
+        { status: 'Delivered', count: 0 },
+        { status: 'Paid', count: 0 }
+      ];
+
+  const topMenuItemsChartData = reports.orders?.topItems && reports.orders.topItems.length > 0
+    ? reports.orders.topItems.map(([name, count]) => ({
+        name: name.length > 15 ? name.substring(0, 15) + '...' : name,
+        count: parseInt(count) || 0
+      }))
+    : [];
+
+  // Debug logging
+  console.log('Reports data:', {
+    ordersByStatus: reports.orders?.byStatus,
+    topMenuItems: reports.orders?.topItems,
+    statusChartData,
+    topMenuItemsChartData
+  });
 
   const roleChartData = reports.staff?.roleStats?.map(role => ({
     name: role.role.charAt(0).toUpperCase() + role.role.slice(1).replace('_', ' '),
@@ -258,15 +289,21 @@ export default function Reports() {
         {/* Orders by Status Chart */}
         <div className="bg-white p-6 rounded-lg shadow">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Orders by Status</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={statusChartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="status" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="count" fill="#3B82F6" />
-            </BarChart>
-          </ResponsiveContainer>
+          {statusChartData.some(d => d.count > 0) ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={statusChartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="status" />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="count" fill="#3B82F6" />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[300px] flex items-center justify-center text-gray-500">
+              <p>No orders data available</p>
+            </div>
+          )}
         </div>
 
         {/* Staff Role Distribution */}
@@ -296,15 +333,21 @@ export default function Reports() {
         {/* Top Menu Items */}
         <div className="bg-white p-6 rounded-lg shadow">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Top Menu Items</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={topItemsChartData} layout="horizontal">
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" />
-              <YAxis dataKey="name" type="category" width={100} />
-              <Tooltip />
-              <Bar dataKey="count" fill="#10B981" />
-            </BarChart>
-          </ResponsiveContainer>
+          {topMenuItemsChartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={topMenuItemsChartData} layout="horizontal">
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis type="number" />
+                <YAxis dataKey="name" type="category" width={100} />
+                <Tooltip />
+                <Bar dataKey="count" fill="#10B981" />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[300px] flex items-center justify-center text-gray-500">
+              <p>No order data available</p>
+            </div>
+          )}
         </div>
 
         {/* Inventory Categories */}
@@ -329,6 +372,64 @@ export default function Reports() {
               <Tooltip />
             </PieChart>
           </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Feedback Section */}
+      <div className="bg-white p-6 rounded-lg shadow mb-8">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Customer Feedback & Reviews</h3>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Feedback Summary */}
+          <div>
+            <h4 className="text-md font-medium text-gray-700 mb-3">Feedback Summary</h4>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span className="text-gray-600">Total Feedback</span>
+                <span className="font-semibold">{reports.reviews?.totalReviews || 0}</span>
+              </div>
+              <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span className="text-gray-600">Average Rating</span>
+                <span className="font-semibold text-yellow-600">
+                  {reports.reviews?.averageRating || '0.00'} ⭐
+                </span>
+              </div>
+              <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span className="text-gray-600">Verified Reviews</span>
+                <span className="font-semibold text-green-600">
+                  {reports.reviews?.verifiedReviews || 0}
+                </span>
+              </div>
+            </div>
+          </div>
+          
+          {/* Recent Feedback */}
+          <div>
+            <h4 className="text-md font-medium text-gray-700 mb-3">Recent Feedback</h4>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {reports.reviews?.recentReviews && reports.reviews.recentReviews.length > 0 ? (
+                reports.reviews.recentReviews.map((review, index) => (
+                  <div key={index} className="p-3 border-l-4 border-blue-500 bg-gray-50 rounded">
+                    <div className="flex justify-between items-start mb-1">
+                      <span className="font-medium text-sm">
+                        {review.Customer?.name || review.customer?.name || 'Anonymous'}
+                      </span>
+                      <span className="text-yellow-500 text-xs">
+                        {'⭐'.repeat(review.rating || 0)}
+                      </span>
+                    </div>
+                    <p className="text-gray-600 text-xs mt-1 line-clamp-2">
+                      {review.comment || 'No comment provided'}
+                    </p>
+                    <p className="text-gray-400 text-xs mt-1">
+                      {new Date(review.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-gray-500 text-sm text-center py-4">No feedback yet</p>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 

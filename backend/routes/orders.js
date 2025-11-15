@@ -100,10 +100,7 @@ router.get('/', async (req, res) => {
 });
 
 // Update order status
-router.patch('/:id/status', [
-  body('status').isIn(['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'DELIVERED', 'CANCELLED'])
-    .withMessage('Invalid status')
-], async (req, res) => {
+router.patch('/:id/status', async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -112,19 +109,66 @@ router.patch('/:id/status', [
 
     const { id } = req.params;
     const { status } = req.body;
-    
+
     const order = await Order.findByPk(id);
     if (!order) {
       return res.status(404).json({ message: 'Order not found' });
     }
-    
+
+    // Validate status transition
+    const validTransitions = {
+      'PENDING': ['CONFIRMED', 'CANCELLED'],
+      'CONFIRMED': ['PREPARING', 'CANCELLED'],
+      'PREPARING': ['READY', 'CANCELLED'],
+      'READY': ['DELIVERED', 'CANCELLED'],
+      'DELIVERED': ['PAID'],
+      'PAID': [],
+      'CANCELLED': []
+    };
+
+    if (!validTransitions[order.status].includes(status)) {
+      return res.status(400).json({ 
+        message: `Cannot change status from ${order.status} to ${status}`,
+        validTransitions: validTransitions[order.status]
+      });
+    }
+
     order.status = status;
     await order.save();
-    
-    res.json(order);
+
+    res.json({ 
+      success: true, 
+      message: `Order status updated to ${status}`,
+      order 
+    });
   } catch (error) {
     console.error('Error updating order status:', error);
-    res.status(500).json({ message: 'Failed to update order status' });
+    res.status(500).json({ message: 'Failed to update order status', error: error.message });
+  }
+});
+
+// Get order by ID
+router.get('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const order = await Order.findByPk(id, {
+      include: [
+        { model: Customer, attributes: ['id', 'name', 'email', 'phone'] },
+        { 
+          model: OrderItem, 
+          include: [{ model: MenuItem, attributes: ['id', 'name', 'price', 'category'] }] 
+        }
+      ]
+    });
+
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    res.json(order);
+  } catch (error) {
+    console.error('Error fetching order:', error);
+    res.status(500).json({ message: 'Failed to fetch order', error: error.message });
   }
 });
 

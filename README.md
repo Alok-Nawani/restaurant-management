@@ -119,6 +119,61 @@ npm run dev
 
 The frontend will be available at `http://localhost:3000`
 
+## 💾 Direct SQL from Terminal (SQLite)
+
+You can add/update data directly using SQLite CLI and see it reflected in the frontend (the backend reads from the same `backend/database.sqlite`).
+
+### Open the database
+```bash
+# From repo root
+sqlite3 "backend/database.sqlite"
+```
+
+If the file doesn’t exist yet, start the backend once to create it or run the seed: `cd backend && npm run seed`.
+
+### Useful tables and columns
+- Customers: `Customers(id, name, phone, email, loyaltyPoints)`
+- Menu items: `MenuItems(id, name, description, price, category, isVeg, available)`
+- Orders: `Orders(id, customerId, status, ... )`
+- Order items: `OrderItems(id, orderId, menuItemId, quantity, price)`
+- Payments: `Payments(id, orderId, amount, method, status)`
+- Users (for login): `Users(id, username, password, name, role)`
+
+Note: SQLite stores booleans as integers (`0`/`1`).
+
+### Example inserts
+```sql
+-- Inside sqlite3 prompt
+-- Add a customer
+INSERT INTO Customers (name, phone, email, loyaltyPoints)
+VALUES ('Neha', '9999990009', 'neha@example.com', 0);
+
+-- Add a menu item
+INSERT INTO MenuItems (name, description, price, category, isVeg, available)
+VALUES ('Pasta Arrabbiata', 'Spicy tomato pasta', 220.0, 'Pasta', 1, 1);
+
+-- Verify
+SELECT * FROM Customers ORDER BY id DESC LIMIT 3;
+SELECT id, name, price FROM MenuItems ORDER BY id DESC LIMIT 3;
+```
+
+Changes appear in the frontend as soon as the UI fetches again (navigate or refresh). Ensure the backend is running and the frontend is pointed to `VITE_API_URL=http://localhost:4000/api`.
+
+### Tips
+- Keep the backend running while editing; SQLite handles concurrent access (writes are short, exclusive transactions).
+- To inspect schema quickly: `\.schema Customers` and `\.tables` inside sqlite3.
+- To exit sqlite3: `\.quit`
+
+### Troubleshooting
+- If you see `Cannot find module 'wkx'` during `npm install`/seed:
+	```bash
+	cd backend
+	rm -rf node_modules package-lock.json
+	npm install
+	```
+	Then re-seed: `npm run seed`.
+ 
+
 ## 🔐 Default Credentials
 
 After seeding the database, you can login with:

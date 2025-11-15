@@ -86,7 +86,8 @@ export default function Orders() {
       CONFIRMED: 'bg-blue-100 text-blue-800',
       PREPARING: 'bg-orange-100 text-orange-800',
       READY: 'bg-green-100 text-green-800',
-      DELIVERED: 'bg-gray-100 text-gray-800',
+      DELIVERED: 'bg-purple-100 text-purple-800',
+      PAID: 'bg-emerald-100 text-emerald-800',
       CANCELLED: 'bg-red-100 text-red-800'
     };
     return colors[status] || 'bg-gray-100 text-gray-800';
@@ -97,7 +98,8 @@ export default function Orders() {
       PENDING: 'CONFIRMED',
       CONFIRMED: 'PREPARING',
       PREPARING: 'READY',
-      READY: 'DELIVERED'
+      READY: 'DELIVERED',
+      DELIVERED: 'PAID'
     };
     return statusFlow[currentStatus];
   };
@@ -130,16 +132,16 @@ export default function Orders() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50">
       {/* Header */}
-      <div className="bg-white shadow-lg sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
+      <div className="bg-green-600 text-white p-6 shadow-lg">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">📋 Order Management</h1>
-              <p className="text-gray-600 mt-1">{orders.length} orders in system</p>
+              <h1 className="text-4xl font-bold mb-2">📋 Order Management</h1>
+              <p className="text-green-100">{orders.length} orders in system</p>
             </div>
             <button
               onClick={() => setShowForm(true)}
-              className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-full font-semibold flex items-center gap-2 transition-all duration-200 shadow-lg hover:shadow-xl"
+              className="bg-white hover:bg-green-50 text-green-600 px-6 py-3 rounded-xl font-semibold flex items-center gap-2 transition-all duration-200 shadow-lg hover:shadow-xl"
             >
               <PlusIcon />
               New Order
@@ -149,6 +151,57 @@ export default function Orders() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 border border-green-200">
+            <div className="flex items-center">
+              <div className="p-3 bg-green-100 rounded-xl">
+                <ClockIcon />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Total Orders</p>
+                <p className="text-3xl font-bold text-gray-900">{orders.length}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 border border-green-200">
+            <div className="flex items-center">
+              <div className="p-3 bg-yellow-100 rounded-xl">
+                <ClockIcon />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Pending Orders</p>
+                <p className="text-3xl font-bold text-gray-900">{orders.filter(o => o.status === 'PENDING').length}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 border border-green-200">
+            <div className="flex items-center">
+              <div className="p-3 bg-orange-100 rounded-xl">
+                <ClockIcon />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Preparing</p>
+                <p className="text-3xl font-bold text-gray-900">{orders.filter(o => o.status === 'PREPARING').length}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 border border-green-200">
+            <div className="flex items-center">
+              <div className="p-3 bg-green-100 rounded-xl">
+                <CheckIcon />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Completed</p>
+                <p className="text-3xl font-bold text-gray-900">{orders.filter(o => ['PAID', 'DELIVERED', 'completed'].includes(o.status)).length}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Status Filter */}
         <div className="mb-8">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Filter by Status</h2>
@@ -163,7 +216,7 @@ export default function Orders() {
             >
               All Orders
             </button>
-            {['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'DELIVERED', 'CANCELLED'].map(status => (
+            {['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'DELIVERED', 'PAID', 'CANCELLED'].map(status => (
               <button
                 key={status}
                 onClick={() => setStatusFilter(status)}
@@ -177,6 +230,60 @@ export default function Orders() {
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Order Workflow Guide */}
+        <div className="mb-8 bg-blue-50 border border-blue-200 rounded-xl p-6">
+          <h3 className="text-lg font-semibold text-blue-900 mb-4 flex items-center gap-2">
+            📋 Order Workflow Guide
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+            <div className="text-center">
+              <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                <span className="text-yellow-600 font-bold">1</span>
+              </div>
+              <p className="text-sm font-medium text-gray-700">PENDING</p>
+              <p className="text-xs text-gray-500">New order received</p>
+            </div>
+            <div className="text-center">
+              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                <span className="text-blue-600 font-bold">2</span>
+              </div>
+              <p className="text-sm font-medium text-gray-700">CONFIRMED</p>
+              <p className="text-xs text-gray-500">Order accepted</p>
+            </div>
+            <div className="text-center">
+              <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                <span className="text-orange-600 font-bold">3</span>
+              </div>
+              <p className="text-sm font-medium text-gray-700">PREPARING</p>
+              <p className="text-xs text-gray-500">Kitchen started</p>
+            </div>
+            <div className="text-center">
+              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                <span className="text-green-600 font-bold">4</span>
+              </div>
+              <p className="text-sm font-medium text-gray-700">READY</p>
+              <p className="text-xs text-gray-500">Food ready</p>
+            </div>
+            <div className="text-center">
+              <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                <span className="text-purple-600 font-bold">5</span>
+              </div>
+              <p className="text-sm font-medium text-gray-700">DELIVERED</p>
+              <p className="text-xs text-gray-500">Served to customer</p>
+            </div>
+            <div className="text-center">
+              <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                <span className="text-emerald-600 font-bold">6</span>
+              </div>
+              <p className="text-sm font-medium text-gray-700">PAID</p>
+              <p className="text-xs text-gray-500">Payment received</p>
+            </div>
+          </div>
+          <p className="text-sm text-blue-700 mt-4 text-center">
+            💡 <strong>Staff Control:</strong> Each step requires manual confirmation. Orders will NOT automatically progress.
+          </p>
         </div>
 
         {/* Orders Grid */}
@@ -245,24 +352,41 @@ export default function Orders() {
                   )}
 
                   {/* Action Buttons */}
-                  <div className="flex gap-2">
-                    {getNextStatus(order.status) && order.status !== 'DELIVERED' && order.status !== 'CANCELLED' && (
+                  <div className="space-y-3">
+                    {/* Status Update Button */}
+                    {getNextStatus(order.status) && order.status !== 'PAID' && order.status !== 'CANCELLED' && (
                       <button
                         onClick={() => handleStatusUpdate(order.id, getNextStatus(order.status))}
-                        className="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+                        className="w-full bg-green-500 hover:bg-green-600 text-white py-3 px-4 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
                       >
                         <CheckIcon />
                         Mark as {getNextStatus(order.status)}
                       </button>
                     )}
+                    
+                    {/* Cancel Button for Pending Orders */}
                     {order.status === 'PENDING' && (
                       <button
                         onClick={() => handleStatusUpdate(order.id, 'CANCELLED')}
-                        className="bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+                        className="w-full bg-red-500 hover:bg-red-600 text-white py-3 px-4 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
                       >
                         <XIcon />
-                        Cancel
+                        Cancel Order
                       </button>
+                    )}
+                    
+                    {/* Completed Status Indicator */}
+                    {order.status === 'PAID' && (
+                      <div className="w-full bg-green-100 text-green-800 py-3 px-4 rounded-lg text-sm font-semibold text-center border border-green-200">
+                        ✅ Order Completed & Paid
+                      </div>
+                    )}
+                    
+                    {/* Cancelled Status Indicator */}
+                    {order.status === 'CANCELLED' && (
+                      <div className="w-full bg-red-100 text-red-800 py-3 px-4 rounded-lg text-sm font-semibold text-center border border-red-200">
+                        ❌ Order Cancelled
+                      </div>
                     )}
                   </div>
                 </div>

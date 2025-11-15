@@ -218,5 +218,16 @@ export const api = {
   getPaymentStats: async () => {
     const res = await fetchJSON('/payments/stats/overview');
     return res.data ?? res;
-  }
+  },
+
+  // SQL Terminal
+  executeSQL: (query) => 
+    fetchJSON('/sql/execute', {
+      method: 'POST',
+      body: JSON.stringify({ query })
+    }),
+  
+  getTables: () => fetchJSON('/sql/tables'),
+  
+  getTableSchema: (tableName) => fetchJSON(`/sql/schema/${tableName}`)
 };

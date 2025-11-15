@@ -1,574 +1,316 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import { api } from '../api/api';
 import toast from 'react-hot-toast';
 
+// Icons
+const UserIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+  </svg>
+);
+
+const PhoneIcon = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+  </svg>
+);
+
+const BriefcaseIcon = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2v2m8 0V6a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V8a2 2 0 012-2V6" />
+  </svg>
+);
+
+const CalendarIcon = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+  </svg>
+);
+
+const DollarIcon = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+  </svg>
+);
+
+const SearchIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+  </svg>
+);
+
 export default function Staff() {
+  const { user } = useAuth();
   const [staff, setStaff] = useState([]);
+  const [filteredStaff, setFilteredStaff] = useState([]);
+  const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [editingStaff, setEditingStaff] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [roleFilter, setRoleFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [stats, setStats] = useState(null);
+  const [positionFilter, setPositionFilter] = useState('');
 
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    role: 'waiter',
-    experience: 0,
-    salary: '',
-    address: '',
-    dateOfBirth: '',
-    shift: 'morning',
-    emergencyContact: '',
-    emergencyContactPhone: '',
-    skills: []
-  });
-
-  useEffect(() => {
-    loadStaff();
-    loadStats();
-  }, []);
-
-  const loadStaff = async () => {
+  async function loadStaff() {
     try {
       setLoading(true);
-      const response = await api.getStaff();
-      setStaff(response.data.staff || []);
+      const [staffData, statsData] = await Promise.all([
+        api.getStaff(),
+        api.getStaffStats()
+      ]);
+      const staffArray = Array.isArray(staffData) ? staffData : (staffData.data?.staff || staffData.staff || staffData.data || []);
+      setStaff(staffArray);
+      setFilteredStaff(staffArray);
+      setStats(statsData.data || statsData);
     } catch (error) {
       console.error('Error loading staff:', error);
       toast.error('Failed to load staff data');
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const loadStats = async () => {
-    try {
-      const response = await api.getStaffStats();
-      setStats(response);
-    } catch (error) {
-      console.error('Error loading staff stats:', error);
+  // Filter staff based on search term and position
+  useEffect(() => {
+    if (!Array.isArray(staff)) return;
+    
+    let filtered = staff;
+
+    if (searchTerm) {
+      filtered = filtered.filter(member =>
+        member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        member.role.toLowerCase().includes(searchTerm.toLowerCase())
+      );
     }
-  };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      setLoading(true);
-      
-      if (editingStaff) {
-        await api.updateStaff(editingStaff.id, formData);
-        toast.success('Staff member updated successfully!');
-      } else {
-        await api.createStaff(formData);
-        toast.success('Staff member added successfully!');
-      }
-      
-      setShowForm(false);
-      setEditingStaff(null);
-      resetForm();
+    if (positionFilter) {
+      filtered = filtered.filter(member => member.role === positionFilter);
+    }
+
+    setFilteredStaff(filtered);
+  }, [searchTerm, positionFilter, staff]);
+
+  useEffect(() => {
+    if (user) {
       loadStaff();
-      loadStats();
-    } catch (error) {
-      console.error('Error saving staff:', error);
-      toast.error(error.message || 'Failed to save staff member');
-    } finally {
+    } else {
       setLoading(false);
     }
-  };
+  }, [user]);
 
-  const handleEdit = (staffMember) => {
-    setEditingStaff(staffMember);
-    setFormData({
-      name: staffMember.name,
-      email: staffMember.email,
-      phone: staffMember.phone,
-      role: staffMember.role,
-      experience: staffMember.experience,
-      salary: staffMember.salary,
-      address: staffMember.address || '',
-      dateOfBirth: staffMember.dateOfBirth || '',
-      shift: staffMember.shift || 'morning',
-      emergencyContact: staffMember.emergencyContact || '',
-      emergencyContactPhone: staffMember.emergencyContactPhone || '',
-      skills: staffMember.skills || []
-    });
-    setShowForm(true);
-  };
-
-  const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to deactivate this staff member?')) {
-      try {
-        setLoading(true);
-        await api.deleteStaff(id);
-        toast.success('Staff member deactivated successfully!');
-        loadStaff();
-        loadStats();
-      } catch (error) {
-        console.error('Error deactivating staff:', error);
-        toast.error('Failed to deactivate staff member');
-      } finally {
-        setLoading(false);
-      }
-    }
-  };
-
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      email: '',
-      phone: '',
-      role: 'waiter',
-      experience: 0,
-      salary: '',
-      address: '',
-      dateOfBirth: '',
-      shift: 'morning',
-      emergencyContact: '',
-      emergencyContactPhone: '',
-      skills: []
-    });
-  };
-
-  const filteredStaff = staff.filter(member => {
-    const matchesSearch = member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         member.phone.includes(searchTerm);
-    const matchesRole = !roleFilter || member.role === roleFilter;
-    const matchesStatus = statusFilter === 'all' || 
-                         (statusFilter === 'active' && member.isActive) ||
-                         (statusFilter === 'inactive' && !member.isActive);
-    
-    return matchesSearch && matchesRole && matchesStatus;
-  });
-
-  const getRoleIcon = (role) => {
-    const icons = {
-      chef: '👨‍🍳',
-      cook: '👩‍🍳',
-      waiter: '🍽️',
-      manager: '👔',
-      cashier: '💰',
-      cleaner: '🧹',
-      security: '🛡️'
-    };
-    return icons[role] || '👤';
-  };
-
-  const getRoleColor = (role) => {
+  const getPositionColor = (role) => {
     const colors = {
-      chef: 'bg-red-100 text-red-800',
-      cook: 'bg-orange-100 text-orange-800',
-      waiter: 'bg-blue-100 text-blue-800',
-      manager: 'bg-purple-100 text-purple-800',
-      cashier: 'bg-green-100 text-green-800',
-      cleaner: 'bg-gray-100 text-gray-800',
-      security: 'bg-indigo-100 text-indigo-800'
+      'chef': 'bg-red-100 text-red-800',
+      'cook': 'bg-orange-100 text-orange-800',
+      'waiter': 'bg-blue-100 text-blue-800',
+      'manager': 'bg-purple-100 text-purple-800',
+      'cashier': 'bg-green-100 text-green-800',
+      'cleaner': 'bg-gray-100 text-gray-800',
+      'security': 'bg-indigo-100 text-indigo-800'
     };
     return colors[role] || 'bg-gray-100 text-gray-800';
   };
 
-  if (loading && staff.length === 0) {
+  const getPositionIcon = (role) => {
+    const icons = {
+      'chef': '👨‍🍳',
+      'cook': '👩‍🍳',
+      'waiter': '🍽️',
+      'manager': '👔',
+      'cashier': '💰',
+      'cleaner': '🧹',
+      'security': '🛡️'
+    };
+    return icons[role] || '👤';
+  };
+
+  const uniquePositions = [...new Set((staff || []).map(member => member.role))];
+
+  if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-purple-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-purple-600 mx-auto mb-4"></div>
+          <p className="text-purple-600 font-medium">Loading Staff Data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-purple-50 flex items-center justify-center">
+        <div className="text-center bg-white p-8 rounded-xl shadow-lg">
+          <div className="text-6xl mb-4">👥</div>
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">Staff Management</h2>
+          <p className="text-gray-600 mb-6">Please log in to manage staff</p>
+          <a 
+            href="/login" 
+            className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-lg font-medium transition-colors"
+          >
+            Go to Login
+          </a>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6">
+    <div className="min-h-screen bg-purple-50">
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Staff Management</h1>
-          <p className="text-gray-600">Manage your restaurant staff and their details</p>
+      <div className="bg-purple-600 text-white p-6 shadow-lg">
+        <div className="max-w-7xl mx-auto">
+          <h1 className="text-4xl font-bold mb-2">👥 Staff Management</h1>
+          <p className="text-purple-100">Manage your restaurant team and track performance</p>
         </div>
-        <button
-          onClick={() => {
-            setShowForm(true);
-            setEditingStaff(null);
-            resetForm();
-          }}
-          className="btn-primary"
-        >
-          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-          </svg>
-          Add Staff
-        </button>
       </div>
 
-      {/* Stats Cards */}
-      {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-          <div className="bg-white p-6 rounded-lg shadow">
+      <div className="max-w-7xl mx-auto p-6">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 border border-purple-200">
             <div className="flex items-center">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
+              <div className="p-3 bg-purple-100 rounded-xl">
+                <UserIcon />
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Total Staff</p>
-                <p className="text-2xl font-semibold text-gray-900">{stats.totalStaff}</p>
+                <p className="text-3xl font-bold text-gray-900">{stats.totalStaff || 0}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow">
+          <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 border border-purple-200">
             <div className="flex items-center">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+              <div className="p-3 bg-red-100 rounded-xl">
+                <BriefcaseIcon />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Active Staff</p>
-                <p className="text-2xl font-semibold text-gray-900">{stats.activeStaff}</p>
+                <p className="text-sm font-medium text-gray-600">Chefs</p>
+                <p className="text-3xl font-bold text-gray-900">{stats.roleStats?.find(r => r.role === 'chef')?.count || 0}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow">
+          <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 border border-purple-200">
             <div className="flex items-center">
-              <div className="p-2 bg-yellow-100 rounded-lg">
-                <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+              <div className="p-3 bg-blue-100 rounded-xl">
+                <BriefcaseIcon />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Waiters</p>
+                <p className="text-3xl font-bold text-gray-900">{stats.roleStats?.find(r => r.role === 'waiter')?.count || 0}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 border border-purple-200">
+            <div className="flex items-center">
+              <div className="p-3 bg-green-100 rounded-xl">
+                <DollarIcon />
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Avg Experience</p>
-                <p className="text-2xl font-semibold text-gray-900">
-                  {stats.experienceStats?.avgExperience ? 
-                    Math.round(stats.experienceStats.avgExperience) : 0} years
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow">
-            <div className="flex items-center">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                </svg>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Roles</p>
-                <p className="text-2xl font-semibold text-gray-900">{stats.roleStats?.length || 0}</p>
+                <p className="text-3xl font-bold text-gray-900">{stats.experienceStats?.avgExperience?.toFixed(1) || 0} years</p>
               </div>
             </div>
           </div>
         </div>
-      )}
 
-      {/* Filters */}
-      <div className="bg-white p-4 rounded-lg shadow mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
-            <input
-              type="text"
-              placeholder="Search by name, email, or phone..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+        {/* Search and Filter */}
+        <div className="mb-8">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="relative flex-1">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <SearchIcon />
+              </div>
+              <input
+                type="text"
+                placeholder="Search staff by name, email, or position..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent shadow-sm"
+              />
+            </div>
             <select
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={positionFilter}
+              onChange={(e) => setPositionFilter(e.target.value)}
+              className="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent shadow-sm"
             >
-              <option value="">All Roles</option>
-              <option value="chef">Chef</option>
-              <option value="cook">Cook</option>
-              <option value="waiter">Waiter</option>
-              <option value="manager">Manager</option>
-              <option value="cashier">Cashier</option>
-              <option value="cleaner">Cleaner</option>
-              <option value="security">Security</option>
+              <option value="">All Positions</option>
+              {uniquePositions.map(position => (
+                <option key={position} value={position}>{position.charAt(0).toUpperCase() + position.slice(1)}</option>
+              ))}
             </select>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">All Status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-          </div>
-          <div className="flex items-end">
-            <button
-              onClick={() => {
-                setSearchTerm('');
-                setRoleFilter('');
-                setStatusFilter('all');
-              }}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-            >
-              Clear Filters
-            </button>
-          </div>
         </div>
-      </div>
 
-      {/* Staff List */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">
-            Staff Members ({filteredStaff.length})
-          </h3>
-        </div>
-        <div className="divide-y divide-gray-200">
-          {filteredStaff.map((member) => (
-            <div key={member.id} className="p-6 hover:bg-gray-50">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="flex-shrink-0">
-                    <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
-                      <span className="text-2xl">{getRoleIcon(member.role)}</span>
+        {/* Staff Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {filteredStaff.length === 0 ? (
+            <div className="col-span-full text-center py-12">
+              <div className="text-6xl mb-4">👥</div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                {searchTerm || positionFilter ? 'No staff found' : 'No staff members yet'}
+              </h3>
+              <p className="text-gray-600">
+                {searchTerm || positionFilter ? 'Try adjusting your search criteria' : 'Staff members will appear here once added'}
+              </p>
+            </div>
+          ) : (
+            filteredStaff.map(member => (
+              <div key={member.id} className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 hover:border-purple-200 group">
+                {/* Staff Avatar */}
+                <div className="h-32 bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center relative">
+                  <div className="w-16 h-16 bg-purple-500 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg">
+                    {getPositionIcon(member.role)}
+                  </div>
+                </div>
+
+                <div className="p-6">
+                  <div className="mb-3">
+                    <h3 className="text-lg font-bold text-gray-900 group-hover:text-purple-600 transition-colors">
+                      {member.name}
+                    </h3>
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getPositionColor(member.role)}`}>
+                      {member.role.charAt(0).toUpperCase() + member.role.slice(1)}
+                    </span>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3 text-gray-600">
+                      <PhoneIcon />
+                      <span className="text-sm">{member.phone}</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-gray-600">
+                      <BriefcaseIcon />
+                      <span className="text-sm">Experience: {member.experience} years</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-gray-600">
+                      <CalendarIcon />
+                      <span className="text-sm">Joined: {new Date(member.dateOfJoining).toLocaleDateString()}</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-gray-600">
+                      <DollarIcon />
+                      <span className="text-sm font-semibold text-green-600">₹{member.salary}/month</span>
                     </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center space-x-2">
-                      <h4 className="text-lg font-medium text-gray-900 truncate">
-                        {member.name}
-                      </h4>
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleColor(member.role)}`}>
-                        {member.role.charAt(0).toUpperCase() + member.role.slice(1)}
+
+                  <div className="mt-4 pt-3 border-t border-gray-100">
+                    <div className="flex justify-between items-center">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        Active
                       </span>
-                      {member.isActive ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          Active
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                          Inactive
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-1 text-sm text-gray-500">
-                      <p>{member.email} • {member.phone}</p>
-                      <p>{member.experience} years experience • ₹{member.salary}/month</p>
-                      {member.shift && (
-                        <p>Shift: {member.shift.charAt(0).toUpperCase() + member.shift.slice(1)}</p>
-                      )}
+                      <span className="text-xs text-gray-500">
+                        ID: {member.id}
+                      </span>
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => handleEdit(member)}
-                    className="p-2 text-gray-400 hover:text-blue-600"
-                    title="Edit"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={() => handleDelete(member.id)}
-                    className="p-2 text-gray-400 hover:text-red-600"
-                    title="Deactivate"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </div>
-
-      {/* Add/Edit Form Modal */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-semibold text-gray-900">
-                  {editingStaff ? 'Edit Staff Member' : 'Add New Staff Member'}
-                </h3>
-                <button
-                  onClick={() => {
-                    setShowForm(false);
-                    setEditingStaff(null);
-                    resetForm();
-                  }}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.name}
-                      onChange={(e) => setFormData({...formData, name: e.target.value})}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-                    <input
-                      type="email"
-                      required
-                      value={formData.email}
-                      onChange={(e) => setFormData({...formData, email: e.target.value})}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Phone *</label>
-                    <input
-                      type="tel"
-                      required
-                      value={formData.phone}
-                      onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Role *</label>
-                    <select
-                      required
-                      value={formData.role}
-                      onChange={(e) => setFormData({...formData, role: e.target.value})}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="chef">Chef</option>
-                      <option value="cook">Cook</option>
-                      <option value="waiter">Waiter</option>
-                      <option value="manager">Manager</option>
-                      <option value="cashier">Cashier</option>
-                      <option value="cleaner">Cleaner</option>
-                      <option value="security">Security</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Experience (years) *</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="50"
-                      required
-                      value={formData.experience}
-                      onChange={(e) => setFormData({...formData, experience: parseInt(e.target.value)})}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Salary (₹/month) *</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      required
-                      value={formData.salary}
-                      onChange={(e) => setFormData({...formData, salary: e.target.value})}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Shift</label>
-                    <select
-                      value={formData.shift}
-                      onChange={(e) => setFormData({...formData, shift: e.target.value})}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="morning">Morning</option>
-                      <option value="afternoon">Afternoon</option>
-                      <option value="evening">Evening</option>
-                      <option value="night">Night</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
-                    <input
-                      type="date"
-                      value={formData.dateOfBirth}
-                      onChange={(e) => setFormData({...formData, dateOfBirth: e.target.value})}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-                  <textarea
-                    value={formData.address}
-                    onChange={(e) => setFormData({...formData, address: e.target.value})}
-                    rows="3"
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Emergency Contact</label>
-                    <input
-                      type="text"
-                      value={formData.emergencyContact}
-                      onChange={(e) => setFormData({...formData, emergencyContact: e.target.value})}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Emergency Contact Phone</label>
-                    <input
-                      type="tel"
-                      value={formData.emergencyContactPhone}
-                      onChange={(e) => setFormData({...formData, emergencyContactPhone: e.target.value})}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-end space-x-4 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowForm(false);
-                      setEditingStaff(null);
-                      resetForm();
-                    }}
-                    className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="btn-primary px-6 py-2 disabled:opacity-50"
-                  >
-                    {loading ? 'Saving...' : (editingStaff ? 'Update' : 'Add')}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
