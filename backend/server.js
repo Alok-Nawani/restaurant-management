@@ -5,6 +5,7 @@ const cors = require('cors');
 const { sequelize, ...models } = require('./models');
 const { attachExportHooks, exportAllTables } = require('./utils/tableExporter');
 const { watchMarkdownFiles } = require('./utils/markdownSync');
+const { startMonitoring } = require('./utils/databaseChangeMonitor');
 
 const customersRouter = require('./routes/customers');
 const menuRouter = require('./routes/menu');
